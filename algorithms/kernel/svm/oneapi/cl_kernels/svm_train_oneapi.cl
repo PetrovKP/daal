@@ -1,4 +1,4 @@
-/* file: svm_train_boser_batch_fpt_dispatcher.cpp */
+/* file: cross_entropy_loss_dense_default.cl */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -17,16 +17,29 @@
 
 /*
 //++
-//  Implementation of SVM training algorithm container.
+//  Implementation of Cross-Entropy Loss OpenCL kernels.
 //--
 */
 
-#include "algorithms/kernel/svm/svm_train_batch_container.h"
+#ifndef __SVM_TRAIN_KERNELS_CL__
+#define __SVM_TRAIN_KERNELS_CL__
 
-namespace daal
-{
-namespace algorithms
-{
-__DAAL_INSTANTIATE_DISPATCH_CONTAINER_SYCL(svm::training::BatchContainer, batch, DAAL_FPTYPE, svm::training::boser)
-} // namespace algorithms
-} // namespace daal
+#include <string.h>
+
+#define DECLARE_SOURCE_DAAL(name, src) static const char *(name) = #src;
+
+DECLARE_SOURCE_DAAL(
+    clKernelSVMTrain,
+
+    void initGradient(const __global algorithmFPType * const y, __global algorithmFPType * grad) {
+        const int i = get_global_id(0);
+        grad[i] = -y[i];
+    }
+
+
+
+);
+
+#undef DECLARE_SOURCE_DAAL
+
+#endif

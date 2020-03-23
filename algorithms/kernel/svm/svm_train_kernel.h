@@ -80,6 +80,7 @@ protected:
     bool findMaximumViolatingPair(size_t nActiveVectors, algorithmFPType tau, int & Bi, int & Bj, algorithmFPType & delta, algorithmFPType & ma,
                                   algorithmFPType & Ma, algorithmFPType & curEps, Status & s) const;
 
+
     Status reconstructGradient(size_t & nActiveVectors);
 
     algorithmFPType WSSi(size_t nActiveVectors, int & Bi) const;
