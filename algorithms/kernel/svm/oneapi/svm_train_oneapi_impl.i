@@ -48,6 +48,8 @@
 
 #include "algorithms/kernel/svm/oneapi/oneapi/cl_kernel/svm_train_oneapi.cl"
 
+#include <cstdlib>
+
 using namespace daal::internal;
 using namespace daal::services::internal;
 
@@ -151,6 +153,12 @@ services::Status SVMTrainOneAPI<algorithmFPType, boser>::compute(const NumericTa
 {
     services::Status status;
 
+    if (const char * env_p = std::getenv("SVM_VERBOSE"))
+    {
+        printf(">> VERBOSE MODE\n");
+        verbose = true;
+    }
+
     const algorithmFPType C(svmPar.C);
     const algorithmFPType eps(svmPar.accuracyThreshold);
     const algorithmFPType tau(svmPar.tau);
@@ -195,7 +203,7 @@ services::Status SVMTrainOneAPI<algorithmFPType, boser>::compute(const NumericTa
         {
             const auto t_1           = high_resolution_clock::now();
             const float duration_sec = duration_cast<milliseconds>(t_1 - t_0).count();
-            printf(">> SelectWS.compute = %f\n", duration_sec / 1000.0f);
+            printf(">> SelectWS.compute time(ms) = %f\n", duration_sec);
         }
     }
 

@@ -65,6 +65,7 @@ protected:
     //   oneapi::internal::UniversalBuffer _fUniversal;
     //   oneapi::internal::UniversalBuffer _sigmoidUniversal;
     //   oneapi::internal::UniversalBuffer _subSigmoidYUniversal;
+    bool verbose = false;
 };
 
 } // namespace internal
