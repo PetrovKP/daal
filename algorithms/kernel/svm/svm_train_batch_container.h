@@ -26,6 +26,8 @@
 #include "algorithms/kernel/svm/svm_train_boser_kernel.h"
 #include "algorithms/classifier/classifier_training_types.h"
 
+#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_kernel.h"
+
 namespace daal
 {
 namespace algorithms

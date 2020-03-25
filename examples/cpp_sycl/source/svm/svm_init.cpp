@@ -12,11 +12,13 @@ string trainDatasetFileName = "../data/batch/svm_two_class_train_dense.csv";
 
 const size_t nFeatures = 20;
 
+void trainModel();
+
 kernel_function::KernelIfacePtr kernel(new kernel_function::linear::Batch<>());
 
 int main(int argc, char * argv[])
 {
-    checkArguments(argc, argv, 2, &trainDatasetFileName, &testDatasetFileName);
+    checkArguments(argc, argv, 1, &trainDatasetFileName);
 
     for (const auto & deviceSelector : getListOfDevices())
     {
@@ -29,7 +31,8 @@ int main(int argc, char * argv[])
         daal::services::SyclExecutionContext ctx(queue);
         services::Environment::getInstance()->setDefaultExecutionContext(ctx);
 
-        trainModel(trainingResult);
+        trainModel();
+        // trainModel(trainingResult);
     }
 
     return 0;
@@ -42,7 +45,7 @@ void trainModel()
     auto trainData        = SyclHomogenNumericTable<>::create(nFeatures, 0, NumericTable::doNotAllocate);
     auto trainGroundTruth = SyclHomogenNumericTable<>::create(1, 0, NumericTable::doNotAllocate);
 
-    auto mergedData(new MergedNumericTable(trainData, trainGroundTruth));
+    NumericTablePtr mergedData(new MergedNumericTable(trainData, trainGroundTruth));
 
     trainDataSource.loadDataBlock(mergedData.get());
 
@@ -60,5 +63,5 @@ void trainModel()
     algorithm.compute();
 
     /* Retrieve the algorithm results */
-    trainingResult = algorithm.getResult();
+    // trainingResult = algorithm.getResult();
 }

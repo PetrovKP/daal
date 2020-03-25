@@ -41,14 +41,18 @@
 #define __SVM_TRAIN_GPU_IMPL_I__
 
 #include "externals/service_memory.h"
-#include "service/kernel/data_management/service_micro_table.h"
 #include "service/kernel/data_management/service_numeric_table.h"
 #include "service/kernel/service_utils.h"
 #include "service/kernel/service_data_utils.h"
+#include "externals/service_ittnotify.h"
 
-#include "algorithms/kernel/svm/oneapi/oneapi/cl_kernel/svm_train_oneapi.cl"
+#include "algorithms/kernel/svm/oneapi/cl_kernels/svm_train_oneapi.cl"
 
+// TODO: DELETE
 #include <cstdlib>
+#include <chrono>
+using namespace std::chrono;
+//
 
 using namespace daal::internal;
 using namespace daal::services::internal;
@@ -63,9 +67,23 @@ namespace training
 {
 namespace internal
 {
+template <typename T>
+inline const T & min(const T & a, const T & b)
+{
+    return !(b < a) ? a : b;
+}
+
+template <typename T>
+inline const T & max(const T & a, const T & b)
+{
+    return (a < b) ? b : a;
+}
+
+using namespace daal::oneapi::internal;
+
 template <typename algorithmFPType, typename ParameterType>
-services::Status SVMTrainOneAPI<algorithmFPType, boser>::initGrad(const services::Buffer<algorithmFPType> & y, services::Buffer<algorithmFPType> & f,
-                                                                  const size_t n)
+services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::initGrad(const services::Buffer<algorithmFPType> & y,
+                                                                                 services::Buffer<algorithmFPType> & f, const size_t n)
 {
     DAAL_ITTNOTIFY_SCOPED_TASK(initGrad);
 
@@ -148,10 +166,13 @@ services::Status SVMTrainOneAPI<algorithmFPType, boser>::initGrad(const services
 // }
 
 template <typename algorithmFPType, typename ParameterType>
-services::Status SVMTrainOneAPI<algorithmFPType, boser>::compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r,
-                                                                 const ParameterType * svmPar)
+services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(const NumericTablePtr & xTable, NumericTable & yTable,
+                                                                                daal::algorithms::Model * r, const ParameterType * svmPar)
 {
     services::Status status;
+
+    auto & ctx        = services::Environment::getInstance()->getDefaultExecutionContext();
+    const auto idType = TypeIds::id<algorithmFPType>();
 
     if (const char * env_p = std::getenv("SVM_VERBOSE"))
     {
@@ -159,45 +180,50 @@ services::Status SVMTrainOneAPI<algorithmFPType, boser>::compute(const NumericTa
         verbose = true;
     }
 
-    const algorithmFPType C(svmPar.C);
-    const algorithmFPType eps(svmPar.accuracyThreshold);
-    const algorithmFPType tau(svmPar.tau);
-    const size_t maxIterations(svmPar.maxIterations);
+    const algorithmFPType C(svmPar->C);
+    const algorithmFPType eps(svmPar->accuracyThreshold);
+    const algorithmFPType tau(svmPar->tau);
+    const size_t maxIterations(svmPar->maxIterations);
     // TODO
     const size_t innerMaxIterations(100);
 
-    size_t nVectors = xTable->getNumberOfRows();
+    const size_t nVectors = xTable->getNumberOfRows();
 
     // ai = 0
-    UniversalBuffer alpha = ctx.allocate(idType, nVectors, &status);
+    auto alpha = ctx.allocate(idType, nVectors, &status);
     ctx.fill(alpha, 0.0, &status);
     DAAL_CHECK_STATUS_VAR(status);
 
     // fi = -yi
-    UniversalBuffer f = ctx.allocate(idType, nVectors, &status);
+    auto fU    = ctx.allocate(idType, nVectors, &status);
+    auto fBuff = fU.get<algorithmFPType>();
     DAAL_CHECK_STATUS_VAR(status);
-    DAAL_CHECK_STATUS(status, initGrad(y, f, nVectors));
+    {
+        BlockDescriptor<algorithmFPType> yBD;
+        yTable.getBlockOfRows(0, nVectors, ReadWriteMode::readOnly, yBD);
 
-    UniversalBuffer alpha = ctx.allocate(idType, nVectors, &status);
-    DAAL_CHECK_STATUS_VAR(status);
+        auto yBuff = yBD.getBuffer();
+        DAAL_CHECK_STATUS(status, initGrad(yBuff, fBuff, nVectors));
+        yTable.releaseBlockOfRows(yBD);
+    }
+
+    // auto alpha = ctx.allocate(idType, nVectors, &status);
+    // DAAL_CHECK_STATUS_VAR(status);
 
     const size_t nWS = SelectWorkingSetSize(nVectors);
 
     if (verbose)
     {
-        printf(">> LINE: %lu: nWS %lu\n", __LINE__, nWS);
+        printf(">> LINE: %d: nWS %lu\n", __LINE__, nWS);
     }
 
     // TODO transfer on GPU
 
     // for (size_t iter = 0; iter < maxIterations; i++)
     {
-        if (verbose)
-        {
-            const auto t_0 = high_resolution_clock::now();
-        }
+        const auto t_0 = high_resolution_clock::now();
 
-        SelectWS();
+        // SelectWS();
 
         if (verbose)
         {
@@ -206,6 +232,7 @@ services::Status SVMTrainOneAPI<algorithmFPType, boser>::compute(const NumericTa
             printf(">> SelectWS.compute time(ms) = %f\n", duration_sec);
         }
     }
+    return status;
 
     // return s.ok() ? task.setResultsToModel(*xTable, *static_cast<Model *>(r), svmPar->C) : s;
 }
@@ -224,15 +251,29 @@ services::Status SVMTrainOneAPI<algorithmFPType, boser>::compute(const NumericTa
 // }
 
 template <typename algorithmFPType, typename ParameterType>
-size_t SVMTrainOneAPI<boser, algorithmFPType, cpu>::SelectWorkingSetSize(const size_t n)
+size_t SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::SelectWorkingSetSize(const size_t n)
 {
     // Depends on cache size
     // constexpr Size max_ws = 512;
     // constexpr Size max_ws = 1024;
     constexpr size_t max_ws = 256;
     // constexpr Size max_ws = 4096;
-    return Min(max_ws, n);
+    return min(max_ws, n);
     // return Min(MaxPow2(n_samples), max_ws);
+}
+
+template <typename algorithmFPType, typename ParameterType>
+services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::buildProgram(ClKernelFactoryIface & factory)
+{
+    services::String options = getKeyFPType<algorithmFPType>();
+
+    services::String cachekey("__daal_algorithms_svm_");
+    cachekey.add(options);
+    options.add(" -D LOCAL_SUM_SIZE=256 ");
+
+    Status status;
+    factory.build(ExecutionTargetIds::device, cachekey.c_str(), clKernelSVMTrain, options.c_str(), &status);
+    return status;
 }
 
 } // namespace internal

@@ -1,4 +1,4 @@
-/* file: cross_entropy_loss_dense_default.cl */
+/* file: mt19937_impl.i */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -17,27 +17,33 @@
 
 /*
 //++
-//  Implementation of Cross-Entropy Loss OpenCL kernels.
+//  Implementation of mt19937 algorithm
 //--
 */
 
-#ifndef __SVM_TRAIN_KERNELS_CL__
-#define __SVM_TRAIN_KERNELS_CL__
+#ifndef __MT19937_IMPL_I__
+#define __MT19937_IMPL_I__
 
-#include <string.h>
+namespace daal
+{
+namespace algorithms
+{
+namespace engines
+{
+namespace mt19937
+{
+namespace internal
+{
+template <typename algorithmFPType, Method method, CpuType cpu>
+Status Mt19937Kernel<algorithmFPType, method, cpu>::compute(NumericTable * resultTensor)
+{
+    return Status();
+}
 
-#define DECLARE_SOURCE_DAAL(name, src) static const char *(name) = #src;
-
-DECLARE_SOURCE_DAAL(
-    clKernelSVMTrain,
-
-    __kernel void initGradient(const __global algorithmFPType * const y, __global algorithmFPType * grad) {
-        const int i = get_global_id(0);
-        grad[i]     = -y[i];
-    }
-
-);
-
-#undef DECLARE_SOURCE_DAAL
+} // namespace internal
+} // namespace mt19937
+} // namespace engines
+} // namespace algorithms
+} // namespace daal
 
 #endif

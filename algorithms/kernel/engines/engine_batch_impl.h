@@ -1,4 +1,4 @@
-/* file: cross_entropy_loss_dense_default.cl */
+/* file: engine_batch_impl.h */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -17,27 +17,45 @@
 
 /*
 //++
-//  Implementation of Cross-Entropy Loss OpenCL kernels.
+//  Implementation of the class defining the engine
 //--
 */
 
-#ifndef __SVM_TRAIN_KERNELS_CL__
-#define __SVM_TRAIN_KERNELS_CL__
+#ifndef __ENGINE_BATCH_IMPL_H__
+#define __ENGINE_BATCH_IMPL_H__
 
-#include <string.h>
+namespace daal
+{
+namespace algorithms
+{
+namespace engines
+{
+namespace internal
+{
+enum ParallelizationTechnique
+{
+    skipahead = 1,
+    leapfrog  = 2,
+    family    = 4
+};
 
-#define DECLARE_SOURCE_DAAL(name, src) static const char *(name) = #src;
+class BatchBaseImpl
+{
+public:
+    BatchBaseImpl(size_t seed) : _seed(seed) {}
+    size_t getSeed() const { return _seed; }
+    virtual void * getState()        = 0;
+    virtual int getStateSize() const = 0;
+    virtual ~BatchBaseImpl() {}
+    virtual bool hasSupport(ParallelizationTechnique technique) const = 0;
 
-DECLARE_SOURCE_DAAL(
-    clKernelSVMTrain,
+protected:
+    const size_t _seed;
+};
 
-    __kernel void initGradient(const __global algorithmFPType * const y, __global algorithmFPType * grad) {
-        const int i = get_global_id(0);
-        grad[i]     = -y[i];
-    }
-
-);
-
-#undef DECLARE_SOURCE_DAAL
+} // namespace internal
+} // namespace engines
+} // namespace algorithms
+} // namespace daal
 
 #endif

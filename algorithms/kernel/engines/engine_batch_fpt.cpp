@@ -1,4 +1,4 @@
-/* file: cross_entropy_loss_dense_default.cl */
+/* file: engine_batch_fpt.cpp */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -17,27 +17,24 @@
 
 /*
 //++
-//  Implementation of Cross-Entropy Loss OpenCL kernels.
+//  Implementation of engine methods.
 //--
 */
 
-#ifndef __SVM_TRAIN_KERNELS_CL__
-#define __SVM_TRAIN_KERNELS_CL__
+#include "algorithms/kernel/engines/engine_batch.h"
 
-#include <string.h>
+namespace daal
+{
+namespace algorithms
+{
+namespace engines
+{
+namespace interface1
+{
+template DAAL_EXPORT services::Status Result::allocate<DAAL_FPTYPE>(const daal::algorithms::Input * input, const daal::algorithms::Parameter * par,
+                                                                    const int method);
 
-#define DECLARE_SOURCE_DAAL(name, src) static const char *(name) = #src;
-
-DECLARE_SOURCE_DAAL(
-    clKernelSVMTrain,
-
-    __kernel void initGradient(const __global algorithmFPType * const y, __global algorithmFPType * grad) {
-        const int i = get_global_id(0);
-        grad[i]     = -y[i];
-    }
-
-);
-
-#undef DECLARE_SOURCE_DAAL
-
-#endif
+} // namespace interface1
+} // namespace engines
+} // namespace algorithms
+} // namespace daal

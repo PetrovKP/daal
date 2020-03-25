@@ -1,4 +1,4 @@
-/* file: cross_entropy_loss_dense_default.cl */
+/* file: mcg59_kernel.h */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -15,29 +15,44 @@
 * limitations under the License.
 *******************************************************************************/
 
-/*
 //++
-//  Implementation of Cross-Entropy Loss OpenCL kernels.
+//  Declaration of template function that calculate mcg59s.
 //--
-*/
 
-#ifndef __SVM_TRAIN_KERNELS_CL__
-#define __SVM_TRAIN_KERNELS_CL__
+#ifndef __MCG59_KERNEL_H__
+#define __MCG59_KERNEL_H__
 
-#include <string.h>
+#include "algorithms/engines/mcg59/mcg59.h"
+#include "algorithms/kernel/kernel.h"
+#include "data_management/data/numeric_table.h"
 
-#define DECLARE_SOURCE_DAAL(name, src) static const char *(name) = #src;
+using namespace daal::services;
+using namespace daal::data_management;
 
-DECLARE_SOURCE_DAAL(
-    clKernelSVMTrain,
+namespace daal
+{
+namespace algorithms
+{
+namespace engines
+{
+namespace mcg59
+{
+namespace internal
+{
+/**
+ *  \brief Kernel for mcg59 calculation
+ */
+template <typename algorithmFPType, Method method, CpuType cpu>
+class Mcg59Kernel : public Kernel
+{
+public:
+    Status compute(NumericTable * resultTable);
+};
 
-    __kernel void initGradient(const __global algorithmFPType * const y, __global algorithmFPType * grad) {
-        const int i = get_global_id(0);
-        grad[i]     = -y[i];
-    }
-
-);
-
-#undef DECLARE_SOURCE_DAAL
+} // namespace internal
+} // namespace mcg59
+} // namespace engines
+} // namespace algorithms
+} // namespace daal
 
 #endif

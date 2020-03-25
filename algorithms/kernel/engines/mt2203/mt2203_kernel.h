@@ -1,4 +1,4 @@
-/* file: svm_train_boser_batch_fpt_cpu.cpp */
+/* file: mt2203_kernel.h */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -15,33 +15,44 @@
 * limitations under the License.
 *******************************************************************************/
 
-/*
 //++
-//  Implementation of SVM boser training algorithm.
+//  Declaration of template function that calculate mt2203s.
 //--
-*/
 
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_kernel.h"
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_impl.i"
+#ifndef __MCG59_KERNEL_H__
+#define __MCG59_KERNEL_H__
+
+#include "algorithms/engines/mt2203/mt2203.h"
+#include "algorithms/kernel/kernel.h"
+#include "data_management/data/numeric_table.h"
+
+using namespace daal::services;
+using namespace daal::data_management;
 
 namespace daal
 {
 namespace algorithms
 {
-namespace svm
+namespace engines
 {
-namespace training
+namespace mt2203
 {
 namespace internal
 {
-template struct SVMTrainOneAPI<DAAL_FPTYPE, svm::interface2::Parameter, boser>;
+/**
+ *  \brief Kernel for mt2203 calculation
+ */
+template <typename algorithmFPType, Method method, CpuType cpu>
+class Mt2203Kernel : public Kernel
+{
+public:
+    Status compute(NumericTable * resultTable);
+};
 
 } // namespace internal
-
-} // namespace training
-
-} // namespace svm
-
+} // namespace mt2203
+} // namespace engines
 } // namespace algorithms
-
 } // namespace daal
+
+#endif

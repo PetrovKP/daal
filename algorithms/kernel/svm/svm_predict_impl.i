@@ -57,10 +57,6 @@ struct SVMPredictImpl<defaultDense, algorithmFPType, cpu> : public Kernel
         Model * model = static_cast<Model *>(const_cast<daal::algorithms::Model *>(m));
         kernel_function::KernelIfacePtr kernel;
         {
-            svm::interface1::Parameter * parameter = dynamic_cast<svm::interface1::Parameter *>(const_cast<daal::algorithms::Parameter *>(par));
-            if (parameter) kernel = parameter->kernel->clone();
-        }
-        {
             svm::interface2::Parameter * parameter = dynamic_cast<svm::interface2::Parameter *>(const_cast<daal::algorithms::Parameter *>(par));
             if (parameter) kernel = parameter->kernel->clone();
         }

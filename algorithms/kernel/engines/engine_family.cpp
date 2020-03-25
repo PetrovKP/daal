@@ -1,4 +1,4 @@
-/* file: svm_train_boser_batch_fpt_cpu.cpp */
+/* file: engine_family.cpp */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -15,33 +15,49 @@
 * limitations under the License.
 *******************************************************************************/
 
-/*
 //++
-//  Implementation of SVM boser training algorithm.
+//  Implementation of initializer types.
 //--
-*/
 
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_kernel.h"
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_impl.i"
+#include "algorithms/engines/engine_family.h"
 
 namespace daal
 {
 namespace algorithms
 {
-namespace svm
+namespace engines
 {
-namespace training
+/**
+ * @ingroup engines
+ * @{
+ */
+namespace interface1
 {
-namespace internal
+FamilyBatchBase::FamilyBatchBase() {}
+
+FamilyBatchBase::FamilyBatchBase(const FamilyBatchBase & other) : FamilyBatchBase::super(other) {}
+
+services::Status FamilyBatchBase::add(size_t numberOfStreams)
 {
-template struct SVMTrainOneAPI<DAAL_FPTYPE, svm::interface2::Parameter, boser>;
+    return addImpl(numberOfStreams);
+}
 
-} // namespace internal
+services::SharedPtr<FamilyBatchBase> FamilyBatchBase::get(size_t i) const
+{
+    return getImpl(i);
+}
 
-} // namespace training
+size_t FamilyBatchBase::getNumberOfStreams() const
+{
+    return getNumberOfStreamsImpl();
+}
 
-} // namespace svm
+size_t FamilyBatchBase::getMaxNumberOfStreams() const
+{
+    return getMaxNumberOfStreamsImpl();
+}
 
+} // namespace interface1
+} // namespace engines
 } // namespace algorithms
-
 } // namespace daal

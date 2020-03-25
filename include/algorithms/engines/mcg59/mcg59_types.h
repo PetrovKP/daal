@@ -1,4 +1,4 @@
-/* file: svm_train_boser_batch_fpt_cpu.cpp */
+/* file: mcg59_types.h */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -17,31 +17,48 @@
 
 /*
 //++
-//  Implementation of SVM boser training algorithm.
+//  Implementation of mcg59 engine.
 //--
 */
 
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_kernel.h"
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_impl.i"
+#ifndef __MCG59_TYPES_H__
+#define __MCG59_TYPES_H__
+
+#include "algorithms/algorithm.h"
+#include "services/daal_defines.h"
+#include "data_management/data/numeric_table.h"
+#include "data_management/data/homogen_numeric_table.h"
 
 namespace daal
 {
 namespace algorithms
 {
-namespace svm
+namespace engines
 {
-namespace training
+/**
+ * @defgroup engines_mcg59 Mcg59 Engine
+ * \copydoc daal::algorithms::engines::mcg59
+ * @ingroup engines
+ * @{
+ */
+/**
+ * \brief Contains classes for mcg59 engine
+ */
+namespace mcg59
 {
-namespace internal
+/**
+ * <a name="DAAL-ENUM-ALGORITHMS__ENGINES__MCG59__METHOD"></a>
+ * Available methods to compute mcg59 engine
+ */
+enum Method
 {
-template struct SVMTrainOneAPI<DAAL_FPTYPE, svm::interface2::Parameter, boser>;
+    defaultDense = 0 /*!< Default: performance-oriented method. */
+};
 
-} // namespace internal
-
-} // namespace training
-
-} // namespace svm
-
+} // namespace mcg59
+/** @} */
+} // namespace engines
 } // namespace algorithms
-
 } // namespace daal
+
+#endif

@@ -1,4 +1,4 @@
-/* file: cross_entropy_loss_dense_default.cl */
+/* file: mcg59_dense_default_batch_fpt_cpu.cpp */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -15,29 +15,33 @@
 * limitations under the License.
 *******************************************************************************/
 
-/*
 //++
-//  Implementation of Cross-Entropy Loss OpenCL kernels.
+//  Implementation of mcg59 calculation functions.
 //--
-*/
 
-#ifndef __SVM_TRAIN_KERNELS_CL__
-#define __SVM_TRAIN_KERNELS_CL__
+#include "algorithms/kernel/engines/mcg59/mcg59_batch_container.h"
+#include "algorithms/kernel/engines/mcg59/mcg59_kernel.h"
+#include "algorithms/kernel/engines/mcg59/mcg59_impl.i"
 
-#include <string.h>
+namespace daal
+{
+namespace algorithms
+{
+namespace engines
+{
+namespace mcg59
+{
+namespace interface1
+{
+template class BatchContainer<DAAL_FPTYPE, defaultDense, DAAL_CPU>;
+} // namespace interface1
 
-#define DECLARE_SOURCE_DAAL(name, src) static const char *(name) = #src;
+namespace internal
+{
+template class Mcg59Kernel<DAAL_FPTYPE, defaultDense, DAAL_CPU>;
+} // namespace internal
 
-DECLARE_SOURCE_DAAL(
-    clKernelSVMTrain,
-
-    __kernel void initGradient(const __global algorithmFPType * const y, __global algorithmFPType * grad) {
-        const int i = get_global_id(0);
-        grad[i]     = -y[i];
-    }
-
-);
-
-#undef DECLARE_SOURCE_DAAL
-
-#endif
+} // namespace mcg59
+} // namespace engines
+} // namespace algorithms
+} // namespace daal

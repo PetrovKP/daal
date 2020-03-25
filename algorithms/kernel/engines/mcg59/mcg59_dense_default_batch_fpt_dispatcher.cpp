@@ -1,4 +1,4 @@
-/* file: cross_entropy_loss_dense_default.cl */
+/* file: mcg59_dense_default_batch_fpt_dispatcher.cpp */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -15,29 +15,16 @@
 * limitations under the License.
 *******************************************************************************/
 
-/*
 //++
-//  Implementation of Cross-Entropy Loss OpenCL kernels.
+//  Implementation of mcg59 calculation algorithm dispatcher.
 //--
-*/
 
-#ifndef __SVM_TRAIN_KERNELS_CL__
-#define __SVM_TRAIN_KERNELS_CL__
+#include "algorithms/kernel/engines/mcg59/mcg59_batch_container.h"
 
-#include <string.h>
-
-#define DECLARE_SOURCE_DAAL(name, src) static const char *(name) = #src;
-
-DECLARE_SOURCE_DAAL(
-    clKernelSVMTrain,
-
-    __kernel void initGradient(const __global algorithmFPType * const y, __global algorithmFPType * grad) {
-        const int i = get_global_id(0);
-        grad[i]     = -y[i];
-    }
-
-);
-
-#undef DECLARE_SOURCE_DAAL
-
-#endif
+namespace daal
+{
+namespace algorithms
+{
+__DAAL_INSTANTIATE_DISPATCH_CONTAINER(engines::mcg59::BatchContainer, batch, DAAL_FPTYPE, engines::mcg59::defaultDense)
+} // namespace algorithms
+} // namespace daal

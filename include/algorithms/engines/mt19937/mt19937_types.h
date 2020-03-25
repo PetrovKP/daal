@@ -1,4 +1,4 @@
-/* file: svm_train_boser_batch_fpt_cpu.cpp */
+/* file: mt19937_types.h */
 /*******************************************************************************
 * Copyright 2014-2020 Intel Corporation
 *
@@ -17,31 +17,48 @@
 
 /*
 //++
-//  Implementation of SVM boser training algorithm.
+//  Implementation of mt19937 engine.
 //--
 */
 
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_kernel.h"
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_impl.i"
+#ifndef __MT19937_TYPES_H__
+#define __MT19937_TYPES_H__
+
+#include "algorithms/algorithm.h"
+#include "services/daal_defines.h"
+#include "data_management/data/numeric_table.h"
+#include "data_management/data/homogen_numeric_table.h"
 
 namespace daal
 {
 namespace algorithms
 {
-namespace svm
+namespace engines
 {
-namespace training
+/**
+ * @defgroup engines_mt19937 Mt19937 Engine
+ * \copydoc daal::algorithms::engines::mt19937
+ * @ingroup engines
+ * @{
+ */
+/**
+ * \brief Contains classes for mt19937 engine
+ */
+namespace mt19937
 {
-namespace internal
+/**
+ * <a name="DAAL-ENUM-ALGORITHMS__ENGINES__MT19937__METHOD"></a>
+ * Available methods to compute mt19937 engine
+ */
+enum Method
 {
-template struct SVMTrainOneAPI<DAAL_FPTYPE, svm::interface2::Parameter, boser>;
+    defaultDense = 0 /*!< Default: performance-oriented method. */
+};
 
-} // namespace internal
-
-} // namespace training
-
-} // namespace svm
-
+} // namespace mt19937
+/** @} */
+} // namespace engines
 } // namespace algorithms
-
 } // namespace daal
+
+#endif
