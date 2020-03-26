@@ -79,6 +79,142 @@ inline const T & max(const T & a, const T & b)
     return (a < b) ? b : a;
 }
 
+template <typename algorithmFPType>
+struct TaskWorkingSet
+{
+    TaskWorkingSet(size_t nVectors) : n(nVectors) {}
+
+    services::Status init()
+    {
+        services::Status status;
+        auto & context       = services::Environment::getInstance()->getDefaultExecutionContext();
+        const auto idType    = TypeIds::id<algorithmFPType>();
+        const auto idTypeInt = TypeIds::id<int>();
+        sortedFIndices       = context.allocate(idTypeInt, nVectors, &status);
+        DAAL_CHECK_STATUS_VAR(status);
+
+        indicator = context.allocate(idTypeInt, nVectors, &status);
+        context.fill(indicator, 0.0, &status);
+        DAAL_CHECK_STATUS_VAR(status);
+
+        fIndices = context.allocate(idTypeInt, nVectors, &status);
+        DAAL_CHECK_STATUS_VAR(status);
+        auto fIndicesBuf = fIndices<int>.get();
+        DAAL_CHECK_STATUS(status, initIndex(fIndicesBuf, n));
+
+        fIndices = context.allocate(idTypeInt, nVectors, &status);
+
+        nWS = min(max_ws, n);
+    }
+
+    size_t getSize() const
+    {
+        constexpr size_t max_ws = 16;
+        return min(max_ws, n);
+    }
+
+    services::Status argSort(services::Buffer<int> & fBuff)
+    {
+        services::Status status;
+        ctx.copy(fIndices, 0, sortedFIndices, 0, n, &status);
+        DAAL_CHECK_STATUS_VAR(status);
+        auto sortedFIndicesBuff = sortedFIndices<int>.get();
+
+        // TODO Replace radix sort
+        {
+            int * sortedFIndices_host = sortedFIndicesBuff.toHost(ReadWriteMode::readWrite).get();
+            algorithmFPType * f_host  = fBuff.toHost(ReadWriteMode::read).get();
+            std::sort(sortedFIndices_host, sortedFIndices_host + n, [](int i, int j) { return f_host[i] < f_host[j]; })
+        }
+        return status;
+    }
+
+    services::Status selectWS(const services::Buffer<algorithmFPType> & yBuff, const services::Buffer<algorithmFPType> & alphaBuff,
+                              const services::Buffer<algorithmFPType> & fBuff, const algorithmFPType C)
+    {
+        services::Status status;
+        static bool firstCall = true;
+        const size_t q        = nWS / 2;
+
+        if (firstCall)
+        {
+            firstCall = false;
+        }
+        else
+        {
+            // copy
+        }
+
+        DAAL_CHECK_STATUS(status, argSort(fBuff));
+        auto sortedFIndicesBuff = sortedFIndices<int>.get();
+
+        auto indicatorBuff = indicator<int>.get();
+
+        DAAL_CHECK_STATUS(status, checkUpper());
+
+        return status;
+    }
+
+    services::Buffer<int> & getSortedFIndices() const { return sortedFIndices<int>.get(); }
+
+    services::Status checkUpper(const services::Buffer<algorithmFPType> & yBuff, const services::Buffer<algorithmFPType> & alphaBuff,
+                                services::Buffer<int> & indicatorBuff, const algorithmFPType C)
+    {
+        DAAL_ITTNOTIFY_SCOPED_TASK(checkUpper);
+
+        auto & context = services::Environment::getInstance()->getDefaultExecutionContext();
+        auto & factory = context.getClKernelFactory();
+
+        services::Status status = buildProgram(factory);
+        DAAL_CHECK_STATUS_VAR(status);
+
+        auto kernel = factory.getKernel("checkUpper");
+
+        KernelArguments args(4);
+        args.set(0, yBuff, AccessModeIds::read);
+        args.set(1, alphaBuff, AccessModeIds::read);
+        args.set(2, C);
+        args.set(3, indicatorBuff, AccessModeIds::write);
+
+        KernelRange range(n);
+
+        context.run(range, kernel, args, &status);
+        DAAL_CHECK_STATUS_VAR(status);
+
+        return status;
+    }
+
+    services::Status initIndex(services::Buffer<int> & x, const size_t n)
+    {
+        DAAL_ITTNOTIFY_SCOPED_TASK(range);
+
+        auto & context = services::Environment::getInstance()->getDefaultExecutionContext();
+        auto & factory = context.getClKernelFactory();
+
+        services::Status status = buildProgram(factory);
+        DAAL_CHECK_STATUS_VAR(status);
+
+        auto kernel = factory.getKernel("range");
+
+        KernelArguments args(1);
+        args.set(0, x, AccessModeIds::write);
+
+        KernelRange range(n);
+
+        context.run(range, kernel, args, &status);
+        DAAL_CHECK_STATUS_VAR(status);
+
+        return status;
+    }
+
+    size_t n;
+    size_t nWS;
+
+    UniversalBuffer sortedFIndices;
+    UniversalBuffer indicator;
+    UniversalBuffer fIndices;
+}
+
 using namespace daal::oneapi::internal;
 
 template <typename algorithmFPType, typename ParameterType>
@@ -107,72 +243,15 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::initGrad
     return status;
 }
 
-// void SelectWorkingSet(VectorView<Int> ws,
-//                       const VectorView<bool> &ws_indicator,
-//                       const Vector<Int> &f_argsort,
-//                       const Vector<Int> &yy,
-//                       const Vector<Float> &aa,
-//                       Float C) {
-
-//     const Size ws_size = ws.size();
-//     const Size n_samples = yy.size();
-
-//     Size n_selected = 0;
-//     Size p_left = 0;
-//     long long p_right = n_samples - 1;
-
-//     const Int *yy_data = yy.data();
-//     const Float *aa_data = aa.data();
-//     const Int *f_argsort_data = f_argsort.data();
-
-//     Int *ws_data = ws.data();
-//     bool *ws_indicator_data = ws_indicator.data();
-
-//     while (n_selected < ws_size) {
-//         if (p_left < n_samples) {
-//             Int i = f_argsort_data[p_left];
-//             while ( ws_indicator_data[i] || !is_I_up(aa_data[i], yy_data[i], C) ) {
-//                 p_left++;
-//                 if (p_left == n_samples) {
-//                     break;
-//                 }
-//                 i = f_argsort_data[p_left];
-//             }
-//             if (p_left < n_samples) {
-//                 ws_data[n_selected] = i;
-//                 ws_indicator_data[i] = 1;
-//                 n_selected++;
-//             }
-//         }
-
-//         if (p_right >= 0) {
-//             Int i = f_argsort_data[p_right];
-//             while ( ws_indicator_data[i] || !is_I_low(aa_data[i], yy_data[i], C) ) {
-//                 p_right--;
-//                 if (p_right == -1) {
-//                     break;
-//                 }
-//                 i = f_argsort_data[p_right];
-//             }
-//             if (p_right >= 0) {
-//                 ws_data[n_selected] = i;
-//                 ws_indicator_data[i] = 1;
-//                 n_selected++;
-//             }
-//         }
-//     }
-
-//     // ws.Sort();
-// }
-
 template <typename algorithmFPType, typename ParameterType>
 services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(const NumericTablePtr & xTable, NumericTable & yTable,
                                                                                 daal::algorithms::Model * r, const ParameterType * svmPar)
 {
     services::Status status;
 
-    auto & ctx        = services::Environment::getInstance()->getDefaultExecutionContext();
-    const auto idType = TypeIds::id<algorithmFPType>();
+    auto & context       = services::Environment::getInstance()->getDefaultExecutionContext();
+    const auto idType    = TypeIds::id<algorithmFPType>();
+    const auto idTypeInt = TypeIds::id<int>();
 
     if (const char * env_p = std::getenv("SVM_VERBOSE"))
     {
@@ -190,14 +269,15 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
     const size_t nVectors = xTable->getNumberOfRows();
 
     // ai = 0
-    auto alpha = ctx.allocate(idType, nVectors, &status);
-    ctx.fill(alpha, 0.0, &status);
+    auto alphaU = context.allocate(idType, nVectors, &status);
+    context.fill(alphaU, 0.0, &status);
     DAAL_CHECK_STATUS_VAR(status);
+    auto alphaBuff = alphaU.get<algorithmFPType>();
 
     // fi = -yi
-    auto fU    = ctx.allocate(idType, nVectors, &status);
-    auto fBuff = fU.get<algorithmFPType>();
+    auto fU = context.allocate(idType, nVectors, &status);
     DAAL_CHECK_STATUS_VAR(status);
+    auto fBuff = fU.get<algorithmFPType>();
     {
         BlockDescriptor<algorithmFPType> yBD;
         yTable.getBlockOfRows(0, nVectors, ReadWriteMode::readOnly, yBD);
@@ -207,10 +287,11 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
         yTable.releaseBlockOfRows(yBD);
     }
 
-    // auto alpha = ctx.allocate(idType, nVectors, &status);
-    // DAAL_CHECK_STATUS_VAR(status);
+    TaskWorkingSet workSet(nVectors);
 
-    const size_t nWS = SelectWorkingSetSize(nVectors);
+    DAAL_CHECK_STATUS(status, workSet.init());
+
+    const size_t nWS = workSet.getSize();
 
     if (verbose)
     {
@@ -223,7 +304,7 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
     {
         const auto t_0 = high_resolution_clock::now();
 
-        // SelectWS();
+        DAAL_CHECK_STATUS(status, SelectWS(workSet));
 
         if (verbose)
         {
@@ -249,18 +330,6 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
 //     }
 //     return 1 << count;
 // }
-
-template <typename algorithmFPType, typename ParameterType>
-size_t SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::SelectWorkingSetSize(const size_t n)
-{
-    // Depends on cache size
-    // constexpr Size max_ws = 512;
-    // constexpr Size max_ws = 1024;
-    constexpr size_t max_ws = 256;
-    // constexpr Size max_ws = 4096;
-    return min(max_ws, n);
-    // return Min(MaxPow2(n_samples), max_ws);
-}
 
 template <typename algorithmFPType, typename ParameterType>
 services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::buildProgram(ClKernelFactoryIface & factory)
