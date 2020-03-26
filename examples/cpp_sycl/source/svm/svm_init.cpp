@@ -8,9 +8,9 @@ using namespace daal;
 using namespace daal::algorithms;
 using namespace daal::data_management;
 
-string trainDatasetFileName = "../data/batch/svm_two_class_train_dense.csv";
+string trainDatasetFileName = "/nfs/inn/proj/numerics1/Users/kpetrov/ats/svm/svm_repo_impl/data.csv";
 
-const size_t nFeatures = 20;
+const size_t nFeatures = 123;
 
 void trainModel();
 
@@ -45,7 +45,7 @@ void trainModel()
     auto trainData        = SyclHomogenNumericTable<>::create(nFeatures, 0, NumericTable::doNotAllocate);
     auto trainGroundTruth = SyclHomogenNumericTable<>::create(1, 0, NumericTable::doNotAllocate);
 
-    NumericTablePtr mergedData(new MergedNumericTable(trainData, trainGroundTruth));
+    NumericTablePtr mergedData(new MergedNumericTable(trainGroundTruth, trainData));
 
     trainDataSource.loadDataBlock(mergedData.get());
 
@@ -53,7 +53,7 @@ void trainModel()
 
     algorithm.parameter.kernel        = kernel;
     algorithm.parameter.cacheSize     = 40000000;
-    algorithm.parameter.C             = 1e-2;
+    algorithm.parameter.C             = 1.0;
     algorithm.parameter.maxIterations = 10;
 
     algorithm.input.set(classifier::training::data, trainData);
