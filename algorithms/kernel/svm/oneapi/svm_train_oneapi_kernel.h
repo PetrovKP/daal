@@ -27,6 +27,8 @@
 #include "algorithms/svm/svm_train_types.h"
 #include "algorithms/kernel/kernel.h"
 
+#include "algorithms/kernel/svm/oneapi/svm_helper.h"
+
 namespace daal
 {
 namespace algorithms
@@ -43,6 +45,8 @@ using namespace daal::services;
 template <typename algorithmFPType, typename ParameterType, Method method>
 class SVMTrainOneAPI : public Kernel
 {
+    using HelperSVM = HelperSVM<algorithmFPType>;
+
 public:
     services::Status compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r, const ParameterType * par);
 };
@@ -56,15 +60,9 @@ public:
 protected:
     // LocalSMO();
 
-    services::Status buildProgram(oneapi::internal::ClKernelFactoryIface & factory);
-
-    size_t GetWSSize(size_t nSamples);
-
     services::Status initGrad(const services::Buffer<algorithmFPType> & y, services::Buffer<algorithmFPType> & f, const size_t n);
 
-    size_t SelectWorkingSetSize(const size_t n);
 
-    // SelectWS();
 
     // UpdateF();
 

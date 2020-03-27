@@ -53,6 +53,18 @@ DECLARE_SOURCE_DAAL(
         indicator[i] = y[i] > 0 && alpha[i] > 0 || y[i] < 0 && alpha[i] < C;
     }
 
+    __kernel void copyBlockIndices(const __global algorithmFPType * const x, const __global int * const ind, const uint ldx, __global algorithmFPType * newX) {
+        const uint index = get_global_id(1);
+        const uint jCol  = get_global_id(0);
+
+        const int iRow = ind[index];
+
+        const __global algorithmFPType * const xi = &x[iRow * ldx];
+        __global algorithmFPType * newXi          = &newX[index * ldx];
+
+        newXi[jCol] = xi[jCol];
+    }
+
 );
 
 #undef DECLARE_SOURCE_DAAL
