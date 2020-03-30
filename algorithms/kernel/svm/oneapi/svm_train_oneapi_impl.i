@@ -73,7 +73,6 @@ namespace training
 {
 namespace internal
 {
-
 template <typename algorithmFPType, typename ParameterType>
 services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::initGrad(const services::Buffer<algorithmFPType> & y,
                                                                                  services::Buffer<algorithmFPType> & f, const size_t nVectors)
@@ -154,11 +153,11 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
 
     const size_t nWS = workSet.getSize();
 
-    SVMCacheOneAPIIface* cache = nullptr;
+    SVMCacheOneAPIIface * cache = nullptr;
 
-    if (cacheSize > nWS*nVectors*sizeof(algorithmFPType))
+    if (cacheSize > nWS * nVectors * sizeof(algorithmFPType))
     {
-        cache    = SVMCacheOneAPI<noCache, algorithmFPType>::create(cacheSize, _nVectors, nWS, xTable, kernel, status);
+        cache = SVMCacheOneAPI<noCache, algorithmFPType>::create(cacheSize, _nVectors, nWS, xTable, kernel, status);
     }
     else
     {
@@ -203,8 +202,6 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
     }
 
     auto kernelWS = cache->getSetRowsBlock();
-
-
 
     DAAL_CHECK_STATUS(status, yTable.releaseBlockOfRows(yBD));
     DAAL_CHECK_STATUS(status, xTable.releaseBlockOfRows(xBD));

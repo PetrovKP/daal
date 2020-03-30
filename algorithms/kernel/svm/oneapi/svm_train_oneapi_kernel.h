@@ -62,8 +62,6 @@ protected:
 
     services::Status initGrad(const services::Buffer<algorithmFPType> & y, services::Buffer<algorithmFPType> & f, const size_t n);
 
-
-
     // UpdateF();
 
     // // CalculateObjective();
