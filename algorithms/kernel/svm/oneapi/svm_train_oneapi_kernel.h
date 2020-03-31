@@ -45,8 +45,6 @@ using namespace daal::services;
 template <typename algorithmFPType, typename ParameterType, Method method>
 class SVMTrainOneAPI : public Kernel
 {
-    using HelperSVM = HelperSVM<algorithmFPType>;
-
 public:
     services::Status compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r, const ParameterType * par);
 };
@@ -54,6 +52,7 @@ public:
 template <typename algorithmFPType, typename ParameterType>
 class SVMTrainOneAPI<algorithmFPType, ParameterType, boser> : public Kernel
 {
+    using Helper = HelperSVM<algorithmFPType>;
 public:
     services::Status compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r, const ParameterType * par);
 
