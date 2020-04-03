@@ -261,7 +261,7 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
 
     if (cacheSize > nWS * nVectors * sizeof(algorithmFPType))
     {
-        cache = SVMCacheOneAPI<noCache, algorithmFPType>::create(cacheSize, nVectors, nWS, xTable, kernel, verbose, status);
+        cache = SVMCacheOneAPI<noCache, algorithmFPType>::create(cacheSize, nWS, nVectors, xTable, kernel, verbose, status);
     }
     else
     {
@@ -293,7 +293,6 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
         }
 
         auto & wsIndices = workSet.getWSIndeces();
-
         {
             const auto t_0 = high_resolution_clock::now();
 
@@ -325,7 +324,7 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
             {
                 const auto t_1           = high_resolution_clock::now();
                 const float duration_sec = duration_cast<milliseconds>(t_1 - t_0).count();
-                printf(">>>> smoKernel (ms) = %.1f\n", duration_sec);
+                printf(">>>> smoKernel (ms) = %.3f\n", duration_sec);
                 printf(">>>> innerIteration = %d diff = %.1f\n", innerIteration, diff);
                 fflush(stdout);
             }
