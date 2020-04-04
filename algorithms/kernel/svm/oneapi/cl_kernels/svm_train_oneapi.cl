@@ -1,6 +1,6 @@
-/* file: cross_entropy_loss_dense_default.cl */
+/* file: svm_train_oneapi.cl */
 /*******************************************************************************
-* Copyright 2014-2020 Intel Corporation
+* Copyright 2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -64,13 +64,13 @@ DECLARE_SOURCE_DAAL(
     }
 
     __kernel void checkFree(const __global algorithmFPType * const alpha, const algorithmFPType C, __global int * indicator) {
-        const int i  = get_global_id(0);
+        const int i                  = get_global_id(0);
         const algorithmFPType alphai = alpha[i];
-        indicator[i] = 0 < alphai && alphai < C;
+        indicator[i]                 = 0 < alphai && alphai < C;
     }
 
     __kernel void resetIndecator(const __global int * const ind, __global int * indicator) {
-        const int i  = get_global_id(0);
+        const int i       = get_global_id(0);
         indicator[ind[i]] = 0;
     }
 
@@ -146,10 +146,10 @@ DECLARE_SOURCE_DAAL(
 
         const algorithmFPType two = 2.0;
 
-        algorithmFPType gradi     = grad[wsIndex];
-        algorithmFPType alphai    = alpha[wsIndex];
+        algorithmFPType gradi           = grad[wsIndex];
+        algorithmFPType alphai          = alpha[wsIndex];
         const algorithmFPType oldalphai = alphai;
-        const algorithmFPType yi  = y[wsIndex];
+        const algorithmFPType yi        = y[wsIndex];
 
         __local algorithmFPType objFunc[WS_SIZE];
         __local int indices[WS_SIZE];
@@ -201,7 +201,6 @@ DECLARE_SOURCE_DAAL(
                 {
                     localEps = max(eps * (algorithmFPType)1e1, localDiff * (algorithmFPType)0.5);
                 }
-
             }
 
             barrier(CLK_LOCAL_MEM_FENCE);
@@ -213,7 +212,6 @@ DECLARE_SOURCE_DAAL(
             const algorithmFPType Kii   = kd[i];
             const algorithmFPType KBiBi = kd[Bi];
             const algorithmFPType KiBi  = kernelWsRows[Bi * ldx + wsIndex];
-
 
             /* M(alpha) = max((b^2/a) : i belongs to I_low(alpha) and ma < grad(alpha) */
             const algorithmFPType b = ma - gradi;
@@ -243,13 +241,13 @@ DECLARE_SOURCE_DAAL(
                 deltaBi = yi > 0 ? C - alphai : alphai;
                 // printf("> deltaBi %.3f\n", deltaBi);
                 // printf("> Bi %d \n", Bi);
-               // printf("> Ma %.f ygrad %.2f ma %.2f alphai %.2f yi %.2f C\n", Ma, gradi, ma, alphai, yi, C);
+                // printf("> Ma %.f ygrad %.2f ma %.2f alphai %.2f yi %.2f C\n", Ma, gradi, ma, alphai, yi, C);
             }
             if (i == Bj)
             {
-                deltaBj                     = yi > 0 ? alphai : C - alphai;
-                const algorithmFPType b     = ma - gradi;
-                const algorithmFPType a     = max(Kii + KBiBi - two * KiBi, tau);
+                deltaBj                 = yi > 0 ? alphai : C - alphai;
+                const algorithmFPType b = ma - gradi;
+                const algorithmFPType a = max(Kii + KBiBi - two * KiBi, tau);
 
                 const algorithmFPType dt = -b / a;
                 deltaBj                  = min(deltaBj, dt);
@@ -277,11 +275,11 @@ DECLARE_SOURCE_DAAL(
         }
         alpha[wsIndex] = alphai;
         deltaalpha[i]  = (alphai - oldalphai) * yi;
-        if (i == 0) {
-            resinfo[0]     = iter;
-            resinfo[1]     = localDiff;
+        if (i == 0)
+        {
+            resinfo[0] = iter;
+            resinfo[1] = localDiff;
         }
-
     }
 
 );
