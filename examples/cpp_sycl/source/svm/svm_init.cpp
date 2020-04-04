@@ -11,11 +11,19 @@ using namespace daal::data_management;
 // string trainDatasetFileName = "/nfs/inn/proj/numerics1/Users/kpetrov/ats/svm/svm_repo_impl/data.csv";
 string trainDatasetFileName = "../data/batch/svm_two_class_train_dense.csv";
 
+string testDatasetFileName = "../data/batch/svm_two_class_test_dense.csv";
+
 const size_t nFeatures = 20;
 
 // const size_t nFeatures = 119;
 
+svm::training::ResultPtr trainingResult;
+classifier::prediction::ResultPtr predictionResult;
+NumericTablePtr testGroundTruth;
+
 void trainModel();
+void testModel();
+void printResults();
 
 kernel_function::KernelIfacePtr kernel(new kernel_function::linear::Batch<>());
 
@@ -35,7 +43,8 @@ int main(int argc, char * argv[])
         services::Environment::getInstance()->setDefaultExecutionContext(ctx);
 
         trainModel();
-        // trainModel(trainingResult);
+        // testModel();
+        // printResults();
     }
 
     return 0;
@@ -54,10 +63,11 @@ void trainModel()
 
     svm::training::Batch<> algorithm;
 
-    algorithm.parameter.kernel        = kernel;
-    algorithm.parameter.cacheSize     = 40000000;
-    algorithm.parameter.C             = 1.0;
-    algorithm.parameter.maxIterations = 10;
+    algorithm.parameter.kernel            = kernel;
+    algorithm.parameter.cacheSize         = 40000000;
+    algorithm.parameter.C                 = 1.0;
+    algorithm.parameter.maxIterations     = 1000;
+    algorithm.parameter.accuracyThreshold = 0.1;
 
     algorithm.input.set(classifier::training::data, trainData);
     algorithm.input.set(classifier::training::labels, trainGroundTruth);
@@ -66,5 +76,52 @@ void trainModel()
     algorithm.compute();
 
     /* Retrieve the algorithm results */
-    // trainingResult = algorithm.getResult();
+    trainingResult = algorithm.getResult();
+
+    auto model                   = trainingResult->get(classifier::training::model);
+    NumericTablePtr svCoeffTable = model->getClassificationCoefficients();
+    NumericTablePtr svIndices    = model->getSupportIndices();
+    const size_t nSV             = svCoeffTable->getNumberOfRows();
+
+    const float bias(model->getBias());
+
+    printf("nSV %lu\n", nSV);
+    printf("bias %lf\n", bias);
+    printNumeric<float>(svCoeffTable, "", "svCoeffTable", 25);
+    printNumeric<int>(svIndices, "", "svIndices", 25);
+}
+
+void testModel()
+{
+    /* Initialize FileDataSource<CSVFeatureManager> to retrieve the test data from a .csv file */
+    FileDataSource<CSVFeatureManager> testDataSource(testDatasetFileName, DataSource::notAllocateNumericTable, DataSource::doDictionaryFromContext);
+
+    /* Create Numeric Tables for testing data and labels */
+    NumericTablePtr testData(new HomogenNumericTable<>(nFeatures, 0, NumericTable::doNotAllocate));
+    testGroundTruth = NumericTablePtr(new HomogenNumericTable<>(1, 0, NumericTable::doNotAllocate));
+    NumericTablePtr mergedData(new MergedNumericTable(testData, testGroundTruth));
+
+    /* Retrieve the data from input file */
+    testDataSource.loadDataBlock(mergedData.get());
+
+    /* Create an algorithm object to predict SVM values */
+    svm::prediction::Batch<> algorithm;
+
+    algorithm.parameter.kernel = kernel;
+
+    /* Pass a testing data set and the trained model to the algorithm */
+    algorithm.input.set(classifier::prediction::data, testData);
+    algorithm.input.set(classifier::prediction::model, trainingResult->get(classifier::training::model));
+
+    /* Predict SVM values */
+    algorithm.compute();
+
+    /* Retrieve the algorithm results */
+    predictionResult = algorithm.getResult();
+}
+
+void printResults()
+{
+    printNumericTables<int, float>(testGroundTruth, predictionResult->get(classifier::prediction::prediction), "Ground truth\t",
+                                   "Classification results", "SVM classification results (first 20 observations):", 20);
 }

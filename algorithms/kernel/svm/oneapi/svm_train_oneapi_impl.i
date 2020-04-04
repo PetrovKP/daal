@@ -162,7 +162,7 @@ template <typename algorithmFPType, typename ParameterType>
 bool SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::checkStopCondition(const algorithmFPType diff, const algorithmFPType diffPrev,
                                                                                const algorithmFPType eps, int & sameLocalDiff)
 {
-    sameLocalDiff = abs(diff - diffPrev) < eps * 1e-3 ? sameLocalDiff + 1 : 0;
+    sameLocalDiff = abs(diff - diffPrev) < eps ? sameLocalDiff + 1 : 0;
 
     if (sameLocalDiff > 5)
     {
@@ -185,7 +185,7 @@ double SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::calculateObjective
     {
         obj += alphaHost[i] - (gradHost[i] + yHost[i]) * alphaHost[i] * yHost[i] * 0.5;
     }
-    return obj;
+    return -obj;
 }
 
 template <typename algorithmFPType, typename ParameterType>
@@ -213,8 +213,6 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
     const size_t maxIterations(svmPar->maxIterations);
     const size_t cacheSize(svmPar->cacheSize);
     kernel_function::KernelIfacePtr kernel = svmPar->kernel->clone();
-    // TODO
-    const size_t innerMaxIterations(100);
 
     const size_t nVectors  = xTable->getNumberOfRows();
     const size_t nFeatures = xTable->getNumberOfColumns();
@@ -233,11 +231,6 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
     DAAL_CHECK_STATUS(status, yTable.getBlockOfRows(0, nVectors, ReadWriteMode::readOnly, yBD));
     auto yBuff = yBD.getBuffer();
 
-    // TOD: Delete xblock. He needs only for kernel
-    BlockDescriptor<algorithmFPType> xBD;
-    DAAL_CHECK_STATUS(status, xTable->getBlockOfRows(0, nVectors, ReadWriteMode::readOnly, xBD));
-    auto xBuff = xBD.getBuffer();
-
     DAAL_CHECK_STATUS(status, initGrad(yBuff, gradBuff, nVectors));
 
     TaskWorkingSet<algorithmFPType> workSet(nVectors, verbose);
@@ -245,7 +238,8 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
     DAAL_CHECK_STATUS(status, workSet.init());
 
     const size_t nWS = workSet.getSize();
-    const size_t q   = nWS / 2;
+
+    const size_t innerMaxIterations(nWS * 1000);
 
     auto deltaalphaU = context.allocate(idType, nWS, &status);
     DAAL_CHECK_STATUS_VAR(status);
@@ -280,11 +274,11 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
 
     // TODO transfer on GPU
 
-    for (size_t iter = 0; iter < 1 /*maxIterations*/; iter++)
+    for (size_t iter = 0; iter < /*maxIterations*/ 1000; iter++)
     {
         if (iter != 0)
         {
-            DAAL_CHECK_STATUS(status, workSet.saveQWSIndeces(q));
+            DAAL_CHECK_STATUS(status, workSet.saveWSIndeces());
         }
         {
             const auto t_0 = high_resolution_clock::now();
@@ -300,23 +294,17 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
             }
         }
 
-        auto & wsIndices = workSet.getWSIndeces();
+        const services::Buffer<int> & wsIndices = workSet.getWSIndeces();
+        DAAL_CHECK_STATUS(status, cache->compute(xTable, wsIndices, nFeatures));
+
+        if (verbose)
         {
-            const auto t_0 = high_resolution_clock::now();
-
-            DAAL_CHECK_STATUS(status, cache->compute(xBuff, wsIndices, nFeatures));
-
-            if (verbose)
-            {
-                const auto t_1           = high_resolution_clock::now();
-                const float duration_sec = duration_cast<milliseconds>(t_1 - t_0).count();
-                printf(">>>> Kernel.compute time(ms) = %.1f\n", duration_sec);
-                fflush(stdout);
-            }
+            printf(">>>> Kernel.compute\n");
+            fflush(stdout);
         }
 
         // TODO: Save half elements from kernel on 1+ iterations
-        auto kernelWS = cache->getSetRowsBlock();
+        const services::Buffer<algorithmFPType> & kernelWS = cache->getSetRowsBlock();
 
         {
             const auto t_0 = high_resolution_clock::now();
@@ -327,6 +315,7 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
                 auto resinfoHost = resinfoBuff.toHost(ReadWriteMode::readOnly, &status).get();
                 innerIteration   = int(resinfoHost[0]);
                 diff             = resinfoHost[1];
+                localInnerIteration += innerIteration;
             }
 
             if (verbose)
@@ -334,7 +323,7 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
                 const auto t_1           = high_resolution_clock::now();
                 const float duration_sec = duration_cast<milliseconds>(t_1 - t_0).count();
                 printf(">>>> smoKernel (ms) = %.3f\n", duration_sec);
-                printf(">>>> innerIteration = %d diff = %.1f\n", innerIteration, diff);
+                printf(">>>> iter %lu localInnerIteration % d innerIteration = %d diff = %.1f\n", iter, localInnerIteration, innerIteration, diff);
                 fflush(stdout);
             }
         }
@@ -344,12 +333,6 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
 
             DAAL_CHECK_STATUS(status, updateGrad(kernelWS, deltaalphaBuff, gradBuff, nVectors, nWS));
 
-            {
-                auto resinfoHost = resinfoBuff.toHost(ReadWriteMode::readOnly).get();
-                innerIteration   = int(resinfoHost[0]);
-                diff             = resinfoHost[1];
-            }
-
             if (verbose)
             {
                 const auto t_1           = high_resolution_clock::now();
@@ -357,13 +340,11 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
                 printf(">>>> updateGrad (ms) = %.1f\n", duration_sec);
                 fflush(stdout);
             }
-
-            localInnerIteration += innerIteration;
         }
         if (verbose)
         {
             double obj = calculateObjective(yBuff, alphaBuff, gradBuff, nVectors);
-            printf(">>>>>> calculateObjective diff = %.3lf\n", obj);
+            printf(">>>>>> calculateObjective obj = %.3lf\n", obj);
         }
 
         if (checkStopCondition(diff, diffPrev, eps, sameLocalDiff))
@@ -377,11 +358,10 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
         diffPrev = diff;
     }
 
-    DAAL_CHECK_STATUS(status, xTable->releaseBlockOfRows(xBD));
+    SaveResultModel<algorithmFPType> result(alphaBuff, gradBuff, yBuff, C, nVectors);
 
-    Result<algorithmFPType> result(alphaBuff, fBuff, yBuff, C, nVectors);
-
-    DAAL_CHECK_STATUS(status, result.setResultsToModel(*xTable, *static_cast<Model *>(r)));
+    DAAL_CHECK_STATUS(status, result.init());
+    DAAL_CHECK_STATUS(status, result.setResultsToModel(xTable, *static_cast<Model *>(r)));
 
     DAAL_CHECK_STATUS(status, yTable.releaseBlockOfRows(yBD));
 
