@@ -76,11 +76,8 @@ protected:
 };
 
 } // namespace internal
-
 } // namespace training
-
 } // namespace svm
-
 } // namespace algorithms
 } // namespace daal
 

@@ -370,19 +370,6 @@ services::Status SVMTrainOneAPI<algorithmFPType, ParameterType, boser>::compute(
     return status;
 }
 
-// inline Size MaxPow2(Size nVectors) {
-//     if (!(n & (n - 1))) {
-//         return nVectors;
-//     }
-
-//     Size count = 0;
-//     while (n > 1) {
-//         nVectors >>= 1;
-//         count++;
-//     }
-//     return 1 << count;
-// }
-
 } // namespace internal
 } // namespace training
 } // namespace svm
