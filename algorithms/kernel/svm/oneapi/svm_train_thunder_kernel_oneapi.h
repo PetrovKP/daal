@@ -1,4 +1,4 @@
-/* file: cross_entropy_loss_dense_default_batch_kernel.h */
+/* file: svm_train_thunder_kernel_oneapi.h */
 /*******************************************************************************
 * Copyright 2020 Intel Corporation
 *
@@ -16,18 +16,18 @@
 *******************************************************************************/
 
 //++
-//  Declaration of template function that calculate cross_entropy_loss.
+//  Declaration of template structs that calculate SVM Training functions.
 //--
 
-#ifndef __SVM_TRAIN_ONEAPI_H__
-#define __SVM_TRAIN_ONEAPI_H__
+#ifndef __SVM_TRAIN_THUNDER_KERNEL_ONEAPI_H__
+#define __SVM_TRAIN_THUNDER_KERNEL_ONEAPI_H__
 
 #include "services/env_detect.h"
 #include "data_management/data/numeric_table.h"
 #include "algorithms/svm/svm_train_types.h"
 #include "algorithms/kernel/kernel.h"
 
-#include "algorithms/kernel/svm/oneapi/svm_helper.h"
+#include "algorithms/kernel/svm/oneapi/svm_helper_oneapi.h"
 
 namespace daal
 {
@@ -46,11 +46,14 @@ template <typename algorithmFPType, typename ParameterType, Method method>
 class SVMTrainOneAPI : public Kernel
 {
 public:
-    services::Status compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r, const ParameterType * par);
+    services::Status compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r, const ParameterType * par)
+    {
+        return services::ErrorMethodNotImplemented;
+    }
 };
 
 template <typename algorithmFPType, typename ParameterType>
-class SVMTrainOneAPI<algorithmFPType, ParameterType, boser> : public Kernel
+class SVMTrainOneAPI<algorithmFPType, ParameterType, thunder> : public Kernel
 {
     using Helper = HelperSVM<algorithmFPType>;
 
@@ -58,7 +61,6 @@ public:
     services::Status compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r, const ParameterType * par);
 
 protected:
-    services::Status initGrad(const services::Buffer<algorithmFPType> & y, services::Buffer<algorithmFPType> & f, const size_t n);
     services::Status updateGrad(const services::Buffer<algorithmFPType> & kernelWS, const services::Buffer<algorithmFPType> & deltaalpha,
                                 services::Buffer<algorithmFPType> & grad, const size_t nVectors, const size_t nWS);
     services::Status smoKernel(const services::Buffer<algorithmFPType> & y, const services::Buffer<algorithmFPType> & kernelWsRows,

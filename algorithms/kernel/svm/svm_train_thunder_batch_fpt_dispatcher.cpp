@@ -1,6 +1,6 @@
-/* file: svm_train_boser_batch_fpt_cpu.cpp */
+/* file: svm_train_thunder_batch_fpt_dispatcher.cpp */
 /*******************************************************************************
-* Copyright 2014-2020 Intel Corporation
+* Copyright 2020 Intel Corporation
 *
 * Licensed under the Apache License, Version 2.0 (the "License");
 * you may not use this file except in compliance with the License.
@@ -17,31 +17,16 @@
 
 /*
 //++
-//  Implementation of SVM boser training algorithm.
+//  Implementation of SVM training algorithm container.
 //--
 */
 
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_kernel.h"
-#include "algorithms/kernel/svm/oneapi/svm_train_oneapi_impl.i"
+#include "algorithms/kernel/svm/svm_train_batch_container.h"
 
 namespace daal
 {
 namespace algorithms
 {
-namespace svm
-{
-namespace training
-{
-namespace internal
-{
-template struct SVMTrainOneAPI<DAAL_FPTYPE, svm::interface2::Parameter, boser>;
-
-} // namespace internal
-
-} // namespace training
-
-} // namespace svm
-
+__DAAL_INSTANTIATE_DISPATCH_CONTAINER_SYCL(svm::training::BatchContainer, batch, DAAL_FPTYPE, svm::training::thunder)
 } // namespace algorithms
-
 } // namespace daal

@@ -53,13 +53,9 @@ struct SVMTrainImpl<boser, algorithmFPType, ParameterType, cpu> : public Kernel
 };
 
 } // namespace internal
-
 } // namespace training
-
 } // namespace svm
-
 } // namespace algorithms
-
 } // namespace daal
 
 #endif

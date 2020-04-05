@@ -1,4 +1,4 @@
-/* file: svm_train_oneapi.cl */
+/* file: svm_train_block_smo_oneapi.cl */
 /*******************************************************************************
 * Copyright 2020 Intel Corporation
 *
@@ -17,74 +17,26 @@
 
 /*
 //++
-//  Implementation of Cross-Entropy Loss OpenCL kernels.
+//  Implementation of SMO algorithm for wokset block.
 //--
 */
 
-#ifndef __SVM_TRAIN_KERNELS_CL__
-#define __SVM_TRAIN_KERNELS_CL__
+#ifndef __SVM_TRAIN_BLOCK_SMO_ONEAPI_CL__
+#define __SVM_TRAIN_BLOCK_SMO_ONEAPI_CL__
 
 #include <string.h>
 
 #define DECLARE_SOURCE_DAAL(name, src) static const char *(name) = #src;
 
 DECLARE_SOURCE_DAAL(
-    clKernelSVMTrain,
-
-    __kernel void initGradient(const __global algorithmFPType * const y, __global algorithmFPType * grad) {
-        const int i = get_global_id(0);
-        grad[i]     = -y[i];
-    }
-
-    __kernel void range(__global int * x) {
-        const int i = get_global_id(0);
-        x[i]        = i;
-    }
+    clKernelBlockSMO,
 
     inline bool IUpper(const algorithmFPType alpha, const algorithmFPType y, const algorithmFPType C) {
-        // (0 < a && a < C) || (y == 1  && a == 0) || (y == -1 && a == C);
         return (y > 0 && alpha < C) || (y < 0 && alpha > 0);
     }
 
     inline bool ILower(const algorithmFPType alpha, const algorithmFPType y, const algorithmFPType C) {
-        // (0 < a && a < C) || (y == -1 && a == 0) || (y == 1 && a == C);
         return (y > 0 && alpha > 0) || (y < 0 && alpha < C);
-    }
-
-    __kernel void checkUpper(const __global algorithmFPType * const y, const __global algorithmFPType * const alpha, const algorithmFPType C,
-                             __global int * indicator) {
-        const int i  = get_global_id(0);
-        indicator[i] = IUpper(alpha[i], y[i], C);
-    }
-
-    __kernel void checkLower(const __global algorithmFPType * const y, const __global algorithmFPType * const alpha, const algorithmFPType C,
-                             __global int * indicator) {
-        const int i  = get_global_id(0);
-        indicator[i] = ILower(alpha[i], y[i], C);
-    }
-
-    __kernel void checkFree(const __global algorithmFPType * const alpha, const algorithmFPType C, __global int * indicator) {
-        const int i                  = get_global_id(0);
-        const algorithmFPType alphai = alpha[i];
-        indicator[i]                 = 0 < alphai && alphai < C;
-    }
-
-    __kernel void resetIndecator(const __global int * const ind, __global int * indicator) {
-        const int i       = get_global_id(0);
-        indicator[ind[i]] = 0;
-    }
-
-    __kernel void copyBlockIndices(const __global algorithmFPType * const x, const __global int * const ind, const uint ldx,
-                                   __global algorithmFPType * newX) {
-        const uint index = get_global_id(1);
-        const uint jCol  = get_global_id(0);
-
-        const int iRow = ind[index];
-
-        const __global algorithmFPType * const xi = &x[iRow * ldx];
-        __global algorithmFPType * newXi          = &newX[index * ldx];
-
-        newXi[jCol] = xi[jCol];
     }
 
     void reduceMax(const __local algorithmFPType * values, __local int * indices) {
@@ -199,7 +151,7 @@ DECLARE_SOURCE_DAAL(
                 localDiff = maxGrad - ma;
                 if (iter == 0)
                 {
-                    localEps = max(eps * (algorithmFPType)1e1, localDiff * (algorithmFPType)0.5);
+                    localEps = max(eps, localDiff * (algorithmFPType)5e-1);
                 }
             }
 
@@ -213,13 +165,19 @@ DECLARE_SOURCE_DAAL(
             const algorithmFPType KBiBi = kd[Bi];
             const algorithmFPType KiBi  = kernelWsRows[Bi * ldx + wsIndex];
 
-            /* M(alpha) = max((b^2/a) : i belongs to I_low(alpha) and ma < grad(alpha) */
-            const algorithmFPType b = ma - gradi;
-            const algorithmFPType a = max(Kii + KBiBi - two * KiBi, tau);
+            if (ILower(alphai, yi, C) && ma < gradi)
+            {
+                /* M(alpha) = max((b^2/a) : i belongs to I_low(alpha) and ma < grad(alpha) */
+                const algorithmFPType b  = ma - gradi;
+                const algorithmFPType a  = max(Kii + KBiBi - two * KiBi, tau);
+                const algorithmFPType dt = b / a;
 
-            const algorithmFPType dt = b / a;
-
-            objFunc[i] = ILower(alphai, yi, C) && ma < gradi ? b * dt : MIN_FLT;
+                objFunc[i] = b * dt;
+            }
+            else
+            {
+                objFunc[i] = MIN_FLT;
+            }
 
             // printf("> objFunc %.2f ygrad %.2f ma %.2f alphai %.2f C %.2f -b * dt %.2f wsIndex %d i %d\n", objFunc[i], gradi, ma, alphai, C, -b * dt, wsIndex, i);
 

@@ -80,7 +80,6 @@ protected:
     bool findMaximumViolatingPair(size_t nActiveVectors, algorithmFPType tau, int & Bi, int & Bj, algorithmFPType & delta, algorithmFPType & ma,
                                   algorithmFPType & Ma, algorithmFPType & curEps, Status & s) const;
 
-
     Status reconstructGradient(size_t & nActiveVectors);
 
     algorithmFPType WSSi(size_t nActiveVectors, int & Bi) const;
@@ -126,17 +125,16 @@ protected:
 template <Method method, typename algorithmFPType, typename ParameterType, CpuType cpu>
 struct SVMTrainImpl : public Kernel
 {
-    services::Status compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r, const ParameterType * par);
+    services::Status compute(const NumericTablePtr & xTable, NumericTable & yTable, daal::algorithms::Model * r, const ParameterType * par)
+    {
+        return services::ErrorMethodNotImplemented;
+    }
 };
 
 } // namespace internal
-
 } // namespace training
-
 } // namespace svm
-
 } // namespace algorithms
-
 } // namespace daal
 
 #endif
