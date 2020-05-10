@@ -144,8 +144,7 @@ Status KMeansBatchKernel<method, algorithmFPType, cpu>::compute(const NumericTab
         {
             DAAL_ITTNOTIFY_SCOPED_TASK(addNTToTaskThreaded);
             /* For the last iteration we do not need to recount of assignmets */
-            NumericTable * sda = assignmetsNT && (kIter == nIter - 1) ? assignmetsNT : nullptr;
-            s                  = task->template addNTToTaskThreaded<method>(ntData, catCoef.get(), sda);
+            s = task->template addNTToTaskThreaded<method>(ntData, catCoef.get(), assignmetsNT && (kIter == nIter - 1) ? assignmetsNT : nullptr);
         }
 
         if (!s)
@@ -225,25 +224,25 @@ Status KMeansBatchKernel<method, algorithmFPType, cpu>::compute(const NumericTab
         clusters = inClusters;
     }
 
-    // if ((kIter != nIter || nIter == 0) && (par->resultsToEvaluate & computeAssignments || par->resultsToEvaluate & computeExactObjectiveFunction))
-    // {
-    //     PostProcessing<method, algorithmFPType, cpu>::computeAssignments(p, nClusters, clusters, ntData, catCoef.get(), assignmetsNT);
-    // }
+    if ((kIter != nIter || nIter == 0) && (par->resultsToEvaluate & computeAssignments || par->resultsToEvaluate & computeExactObjectiveFunction))
+    {
+        PostProcessing<method, algorithmFPType, cpu>::computeAssignments(p, nClusters, clusters, ntData, catCoef.get(), assignmetsNT);
+    }
 
-    // WriteOnlyRows<algorithmFPType, cpu> mtTarget(*const_cast<NumericTable *>(r[2]), 0, 1);
-    // DAAL_CHECK_BLOCK_STATUS(mtTarget);
-    // if (par->resultsToEvaluate & computeExactObjectiveFunction)
-    // {
-    //     algorithmFPType exactTargetFunc = algorithmFPType(0);
-    //     PostProcessing<method, algorithmFPType, cpu>::computeExactObjectiveFunction(p, nClusters, clusters, ntData, catCoef.get(), assignmetsNT,
-    //                                                                                 exactTargetFunc);
+    WriteOnlyRows<algorithmFPType, cpu> mtTarget(*const_cast<NumericTable *>(r[2]), 0, 1);
+    DAAL_CHECK_BLOCK_STATUS(mtTarget);
+    if (par->resultsToEvaluate & computeExactObjectiveFunction)
+    {
+        algorithmFPType exactTargetFunc = algorithmFPType(0);
+        PostProcessing<method, algorithmFPType, cpu>::computeExactObjectiveFunction(p, nClusters, clusters, ntData, catCoef.get(), assignmetsNT,
+                                                                                    exactTargetFunc);
 
-    //     *mtTarget.get() = exactTargetFunc;
-    // }
-    // else
-    // {
-    //     *mtTarget.get() = oldTargetFunc;
-    // }
+        *mtTarget.get() = exactTargetFunc;
+    }
+    else
+    {
+        *mtTarget.get() = oldTargetFunc;
+    }
 
     WriteOnlyRows<int, cpu> mtIterations(*const_cast<NumericTable *>(r[3]), 0, 1);
     DAAL_CHECK_BLOCK_STATUS(mtIterations);
