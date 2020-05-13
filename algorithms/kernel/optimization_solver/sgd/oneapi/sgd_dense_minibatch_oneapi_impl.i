@@ -25,6 +25,7 @@
 #include "algorithms/kernel/optimization_solver/iterative_solver_kernel.h"
 #include "data_management/data/numeric_table_sycl_homogen.h"
 #include "externals/service_math.h"
+#include "service/kernel/oneapi/reducer.h"
 
 #include "externals/service_ittnotify.h"
 
@@ -42,25 +43,20 @@ namespace internal
 {
 using namespace daal::oneapi::internal;
 using namespace daal::data_management;
+using namespace daal::oneapi::internal::math;
 
-static uint32_t getWorkgroupsCount(const uint32_t n, const uint32_t localWorkSize)
+template <typename algorithmFPType>
+inline algorithmFPType max(const algorithmFPType a, const algorithmFPType b)
 {
-    const uint32_t elementsPerGroup = localWorkSize;
-    uint32_t workgroupsCount        = n / elementsPerGroup;
-
-    if (workgroupsCount * elementsPerGroup < n)
-    {
-        workgroupsCount++;
-    }
-    return workgroupsCount;
+    return (a < b) ? b : a;
 }
 
-template <typename algorithmFPType, CpuType cpu>
-services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::makeStep(const uint32_t argumentSize,
-                                                                            const services::Buffer<algorithmFPType> & prevWorkValueBuff,
-                                                                            const services::Buffer<algorithmFPType> & gradientBuff,
-                                                                            services::Buffer<algorithmFPType> & workValueBuff,
-                                                                            const algorithmFPType learningRate, const algorithmFPType consCoeff)
+template <typename algorithmFPType>
+services::Status SGDKernelOneAPI<algorithmFPType, miniBatch>::makeStep(const uint32_t argumentSize,
+                                                                       const services::Buffer<algorithmFPType> & prevWorkValueBuff,
+                                                                       const services::Buffer<algorithmFPType> & gradientBuff,
+                                                                       services::Buffer<algorithmFPType> & workValueBuff,
+                                                                       const algorithmFPType learningRate, const algorithmFPType consCoeff)
 {
     DAAL_ITTNOTIFY_SCOPED_TASK(makeStep);
     services::Status status;
@@ -86,75 +82,22 @@ services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::makeStep(cons
     return status;
 }
 
-template <typename algorithmFPType, CpuType cpu>
-static services::Status sumReduction(const services::Buffer<algorithmFPType> & reductionBuffer, const size_t nWorkGroups, algorithmFPType & result)
-{
-    auto sumReductionArrayPtr      = reductionBuffer.toHost(data_management::readOnly);
-    const auto * sumReductionArray = sumReductionArrayPtr.get();
-
-    // Final summation with CPU
-    for (size_t i = 0; i < nWorkGroups; i++)
-    {
-        result += sumReductionArray[i];
-    }
-    return services::Status();
-}
-
-template <typename algorithmFPType, CpuType cpu>
-services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::vectorNorm(const services::Buffer<algorithmFPType> & x, const uint32_t n,
-                                                                              algorithmFPType & norm)
+template <typename algorithmFPType>
+services::Status SGDKernelOneAPI<algorithmFPType, miniBatch>::vectorNorm(const services::Buffer<algorithmFPType> & x, const uint32_t n,
+                                                                         algorithmFPType & norm)
 {
     services::Status status;
-
-    const TypeIds::Id idType = TypeIds::id<algorithmFPType>();
-
-    ExecutionContextIface & ctx    = services::Environment::getInstance()->getDefaultExecutionContext();
-    ClKernelFactoryIface & factory = ctx.getClKernelFactory();
-
-    buildProgram(factory);
-
-    const char * const kernelName = "sumSq";
-    KernelPtr kernel              = factory.getKernel(kernelName);
-
-    // InfoDevice& info = ctx.getInfoDevice();
-    // const size_t maxWorkItemSizes1d = info.max_work_item_sizes_1d;
-    // const size_t maxWorkGroupSize = info.max_work_group_size;
-
-    size_t workItemsPerGroup = 256;
-    const size_t nWorkGroups = getWorkgroupsCount(n, workItemsPerGroup);
-
-    KernelRange localRange(workItemsPerGroup);
-    KernelRange globalRange(workItemsPerGroup * nWorkGroups);
-
-    KernelNDRange range(1);
-
-    range.local(localRange, &status);
-    range.global(globalRange, &status);
+    auto resultOp = Reducer::reduce(Reducer::BinaryOp::SUM_OF_SQUARES, Layout::RowMajor, x, 1, n, &status);
     DAAL_CHECK_STATUS_VAR(status);
-
-    UniversalBuffer buffer                            = ctx.allocate(idType, nWorkGroups, &status);
-    services::Buffer<algorithmFPType> reductionBuffer = buffer.get<algorithmFPType>();
-
-    KernelArguments args(3 /*4*/);
-    args.set(0, x, AccessModeIds::read);
-    args.set(1, n);
-    args.set(2, reductionBuffer, AccessModeIds::write);
-    //args.set(3, LocalBuffer(idType, workItemsPerGroup));
-
-    {
-        DAAL_ITTNOTIFY_SCOPED_TASK(vectorNorm.run);
-        ctx.run(range, kernel, args, &status);
-    }
-
-    status = sumReduction<algorithmFPType, cpu>(reductionBuffer, nWorkGroups, norm);
-
-    norm = daal::internal::Math<algorithmFPType, cpu>::sSqrt(norm);
-
+    UniversalBuffer sumOfSq = resultOp.reduceRes;
+    auto sumOfSqHost        = sumOfSq.get<algorithmFPType>().toHost(data_management::readOnly, &status);
+    norm                    = *sumOfSqHost;
+    norm                    = sqrt(norm);
     return status;
 }
 
-template <typename algorithmFPType, CpuType cpu>
-void SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::buildProgram(ClKernelFactoryIface & factory)
+template <typename algorithmFPType>
+void SGDKernelOneAPI<algorithmFPType, miniBatch>::buildProgram(ClKernelFactoryIface & factory)
 {
     DAAL_ITTNOTIFY_SCOPED_TASK(buildProgram);
     services::String options = getKeyFPType<algorithmFPType>();
@@ -166,12 +109,12 @@ void SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::buildProgram(ClKernelFact
     factory.build(ExecutionTargetIds::device, cachekey.c_str(), clKernelSGDMiniBatch, options.c_str());
 }
 
-template <typename algorithmFPType, CpuType cpu>
-services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::compute(HostAppIface * pHost, NumericTable * inputArgument,
-                                                                           NumericTablePtr minimum, NumericTable * nIterations,
-                                                                           Parameter<miniBatch> * parameter, NumericTable * learningRateSequence,
-                                                                           NumericTable * batchIndices, OptionalArgument * optionalArgument,
-                                                                           OptionalArgument * optionalResult, engines::BatchBase & engine)
+template <typename algorithmFPType>
+services::Status SGDKernelOneAPI<algorithmFPType, miniBatch>::compute(HostAppIface * pHost, NumericTable * inputArgument, NumericTablePtr minimum,
+                                                                      NumericTable * nIterations, Parameter<miniBatch> * parameter,
+                                                                      NumericTable * learningRateSequence, NumericTable * batchIndices,
+                                                                      OptionalArgument * optionalArgument, OptionalArgument * optionalResult,
+                                                                      engines::BatchBase & engine)
 {
     services::Status status;
 
@@ -182,9 +125,10 @@ services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::compute(HostA
     const size_t L            = parameter->innerNIterations;
     const size_t batchSize    = parameter->batchSize;
 
-    WriteRows<int, cpu> nIterationsBD(*nIterations, 0, 1);
-    DAAL_CHECK_BLOCK_STATUS(nIterationsBD);
-    int * nProceededIterations = nIterationsBD.get();
+    BlockDescriptor<int> nIterationsBD;
+    DAAL_CHECK_STATUS(status, nIterations->getBlockOfRows(0, 1, ReadWriteMode::writeOnly, nIterationsBD));
+
+    int * nProceededIterations = nIterationsBD.getBlockPtr();
     // if nIter == 0, set result as start point, the number of executed iters to 0
     if (nIter == 0 || L == 0)
     {
@@ -214,25 +158,26 @@ services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::compute(HostA
     NumericTablePtr previousArgument = function->sumOfFunctionsInput->get(sum_of_functions::argument);
     function->sumOfFunctionsInput->set(sum_of_functions::argument, workValueSNT);
 
-    ReadRows<algorithmFPType, cpu> learningRateBD(*learningRateSequence, 0, 1);
-    DAAL_CHECK_BLOCK_STATUS(learningRateBD);
-    const algorithmFPType * const learningRateArray = learningRateBD.get();
+    BlockDescriptor<algorithmFPType> learningRateBD;
+    DAAL_CHECK_STATUS(status, learningRateSequence->getBlockOfRows(0, 1, ReadWriteMode::readOnly, learningRateBD));
+    const algorithmFPType * const learningRateArray = learningRateBD.getBlockPtr();
 
     NumericTable * conservativeSequence = parameter->conservativeSequence.get();
-    ReadRows<algorithmFPType, cpu> consCoeffsBD(*conservativeSequence, 0, 1);
-    DAAL_CHECK_BLOCK_STATUS(consCoeffsBD);
-    const algorithmFPType * const consCoeffsArray = consCoeffsBD.get();
+
+    BlockDescriptor<algorithmFPType> consCoeffsBD;
+    DAAL_CHECK_STATUS(status, conservativeSequence->getBlockOfRows(0, 1, ReadWriteMode::readOnly, consCoeffsBD));
+    const algorithmFPType * const consCoeffsArray = consCoeffsBD.getBlockPtr();
 
     const size_t consCoeffsLength   = conservativeSequence->getNumberOfColumns();
     const size_t learningRateLength = learningRateSequence->getNumberOfColumns();
 
     const IndicesStatus indicesStatus = (batchIndices ? user : (batchSize < nTerms ? random : all));
-    services::SharedPtr<HomogenNumericTableCPU<int, cpu> > ntBatchIndices;
+    services::SharedPtr<HomogenNumericTableCPU<int, sse2> > ntBatchIndices;
 
     if (indicesStatus == user || indicesStatus == random)
     {
         // Replace by SyclNumericTable when will be RNG on GPU
-        ntBatchIndices = HomogenNumericTableCPU<int, cpu>::create(batchSize, 1, &status);
+        ntBatchIndices = HomogenNumericTableCPU<int, sse2>::create(batchSize, 1, &status);
     }
 
     NumericTablePtr previousBatchIndices            = function->sumOfFunctionsParameter->batchIndices;
@@ -245,9 +190,12 @@ services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::compute(HostA
     size_t startIteration = 0, nProceededIters = 0;
     if (lastIterationInput)
     {
-        ReadRows<int, cpu, NumericTable> lastIterationInputBD(lastIterationInput, 0, 1);
-        const int * lastIterationInputArray = lastIterationInputBD.get();
+        BlockDescriptor<int> lastIterationInputBD;
+        DAAL_CHECK_STATUS(status, lastIterationInput->getBlockOfRows(0, 1, ReadWriteMode::readOnly, learningRateBD));
+
+        const int * lastIterationInputArray = lastIterationInputBD.getBlockPtr();
         startIteration                      = lastIterationInputArray[0];
+        DAAL_CHECK_STATUS(status, lastIterationInput->releaseBlockOfRows(lastIterationInputBD));
     }
 
     if (pastWorkValueInput)
@@ -258,7 +206,7 @@ services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::compute(HostA
         const services::Buffer<algorithmFPType> pastWorkValueInputBuff = pastWorkValueInputBD.getBuffer();
 
         ctx.copy(prevWorkValueBuff, 0, pastWorkValueInputBuff, 0, argumentSize, &status);
-        pastWorkValueInput->releaseBlockOfRows(pastWorkValueInputBD);
+        DAAL_CHECK_STATUS(status, pastWorkValueInput->releaseBlockOfRows(pastWorkValueInputBD));
     }
     else
     {
@@ -273,8 +221,9 @@ services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::compute(HostA
 
     DAAL_CHECK_STATUS(status, inputArgument->releaseBlockOfRows(startValueBD));
 
-    ReadRows<int, cpu> predefinedBatchIndicesBD(batchIndices, 0, nIter);
-    iterative_solver::internal::RngTask<int, cpu> rngTask(predefinedBatchIndicesBD.get(), batchSize);
+    BlockDescriptor<int> predefinedBatchIndicesBD;
+    DAAL_CHECK_STATUS(status, batchIndices->getBlockOfRows(0, nIter, ReadWriteMode::readOnly, learningRateBD));
+    iterative_solver::internal::RngTask<int, sse2> rngTask(predefinedBatchIndicesBD.getBlockPtr(), batchSize);
     rngTask.init(nTerms, engine);
 
     algorithmFPType learningRate = learningRateArray[0];
@@ -319,7 +268,7 @@ services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::compute(HostA
                 algorithmFPType pointNorm = algorithmFPType(0), gradientNorm = algorithmFPType(0);
                 vectorNorm(workValueBuff, argumentSize, pointNorm);
                 vectorNorm(gradientBuff, argumentSize, gradientNorm);
-                const double gradientThreshold = accuracyThreshold * daal::internal::Math<algorithmFPType, cpu>::sMax(1.0, pointNorm);
+                const double gradientThreshold = accuracyThreshold * max(algorithmFPType(1), pointNorm);
 
                 if (gradientNorm < gradientThreshold)
                 {
@@ -336,23 +285,29 @@ services::Status SGDKernelOneAPI<algorithmFPType, miniBatch, cpu>::compute(HostA
 
     if (lastIterationResult)
     {
-        WriteRows<int, cpu, NumericTable> lastIterationResultBD(lastIterationResult, 0, 1);
-        int * lastIterationResultArray = lastIterationResultBD.get();
+        BlockDescriptor<int> lastIterationResultBD;
+        DAAL_CHECK_STATUS(status, lastIterationResult->getBlockOfRows(0, 1, ReadWriteMode::writeOnly, lastIterationResultBD));
+        int * lastIterationResultArray = lastIterationResultBD.getBlockPtr();
         lastIterationResultArray[0]    = startIteration + nProceededIters;
+        DAAL_CHECK_STATUS(status, lastIterationResult->releaseBlockOfRows(lastIterationResultBD));
     }
 
     if (pastWorkValueResult)
     {
         BlockDescriptor<algorithmFPType> pastWorkValueResultBD;
-        pastWorkValueResult->getBlockOfRows(0, argumentSize, ReadWriteMode::writeOnly, pastWorkValueResultBD);
+        DAAL_CHECK_STATUS(status, pastWorkValueResult->getBlockOfRows(0, argumentSize, ReadWriteMode::writeOnly, pastWorkValueResultBD));
 
         services::Buffer<algorithmFPType> pastWorkValueResultBuffer = pastWorkValueResultBD.getBuffer();
 
         ctx.copy(pastWorkValueResultBuffer, 0, prevWorkValueBuff, 0, argumentSize, &status);
-        pastWorkValueResult->releaseBlockOfRows(pastWorkValueResultBD);
+        DAAL_CHECK_STATUS(status, pastWorkValueResult->releaseBlockOfRows(pastWorkValueResultBD));
     }
 
+    DAAL_CHECK_STATUS(status, batchIndices->releaseBlockOfRows(predefinedBatchIndicesBD));
+    DAAL_CHECK_STATUS(status, learningRateSequence->releaseBlockOfRows(learningRateBD));
+    DAAL_CHECK_STATUS(status, conservativeSequence->releaseBlockOfRows(consCoeffsBD));
     DAAL_CHECK_STATUS(status, minimum->releaseBlockOfRows(workValueBD));
+    DAAL_CHECK_STATUS(status, nIterations->releaseBlockOfRows(nIterationsBD));
 
     function->sumOfFunctionsParameter->batchIndices = previousBatchIndices;
     function->sumOfFunctionsInput->set(sum_of_functions::argument, previousArgument);
