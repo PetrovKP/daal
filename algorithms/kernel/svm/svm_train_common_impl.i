@@ -184,6 +184,7 @@ services::Status SubDataTaskDense<algorithmFPType, cpu>::copyDataByIndices(const
     NumericTable & x    = *xTable.get();
     const size_t p      = x.getNumberOfColumns();
     const size_t nBlock = this->_nSubsetVectors;
+
     SafeStatus safeStat;
     daal::threader_for(nBlock, nBlock, [&](const size_t iBlock) {
         size_t iRows = wsIndices[iBlock];
