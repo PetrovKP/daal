@@ -26,6 +26,9 @@
 
 #include "service/kernel/service_utils.h"
 #include "algorithms/kernel/service_sort.h"
+#include "algorithms/kernel/service_heap.h"
+
+#include <algorithm>
 
 namespace daal
 {
@@ -56,6 +59,7 @@ struct TaskWorkingSet
             return static_cast<const IdxValType *>(a)->key > static_cast<const IdxValType *>(b)->key;
         }
         bool operator<(const IdxValType & o) const { return key < o.key; }
+        bool operator>(const IdxValType & o) const { return key > o.key; }
     };
 
     services::Status init()
@@ -101,63 +105,183 @@ struct TaskWorkingSet
     {
         DAAL_ITTNOTIFY_SCOPED_TASK(select);
         services::Status status;
-        IdxValType * const sortedFIndices = _sortedFIndices.get();
-
-        for (size_t i = 0; i < _nVectors; ++i)
+        IdxValType * sortedFIndices = _sortedFIndices.get();
         {
-            _sortedFIndices[i].key = f[i];
-            _sortedFIndices[i].val = i;
+            DAAL_ITTNOTIFY_SCOPED_TASK(select.copy);
+
+            for (size_t i = 0; i < _nVectors; ++i)
+            {
+                _sortedFIndices[i].key = f[i];
+                _sortedFIndices[i].val = i;
+            }
+
+            // const size_t blockSize = 1024;
+            // const size_t nBlocks   = _nVectors / blockSize + !!(_nVectors % blockSize);
+            // daal::threader_for(nBlocks, nBlocks, [&](const size_t iBlock) {
+            //     const size_t startRow = iBlock * blockSize;
+            //     const size_t endRow   = (iBlock != nBlocks - 1) ? startRow + blockSize : _nVectors;
+            //     for (size_t i = startRow; i < endRow; ++i)
+            //     {
+            //         sortedFIndices[i].key = f[i];
+            //         sortedFIndices[i].val = i;
+            //     }
+            // });
         }
 
-        daal::algorithms::internal::qSortByKey<IdxValType, cpu>(_nVectors, sortedFIndices);
+        // algorithms::internal::makeMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + _nVectors,
+        //                                        [](const IdxValType & a, const IdxValType & b) { return a > b; });
 
-        int64_t pLeft  = 0;
-        int64_t pRight = _nVectors - 1;
-        while (_nSelected < _nWS && (pRight >= 0 || pLeft < _nVectors))
+        // std::make_heap(sortedFIndicesMin, sortedFIndicesMin + _nVectors, [](const IdxValType & a, const IdxValType & b) { return a < b; });
+
+        // algorithms::internal::makeMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + _nVectors,
+        //                                        [](const IdxValType & a, const IdxValType & b) { return a < b; });
+        // algorithms::internal::makeMaxHeap<cpu>(sortedFIndicesMin, sortedFIndicesMin + _nVectors,
+        //                                        [](const IdxValType & a, const IdxValType & b) { return a > b; });
+
+        // int64_t pRight = 0;
+
+        // const size_t rk = _nSelected + (_nWS - _nSelected) / 2;
+        // {
+        //     int64_t pLeft = 0;
+        //     DAAL_ITTNOTIFY_SCOPED_TASK(select.select1);
+        //     while (_nSelected < rk && pLeft < _nVectors)
+        //     {
+        //         if (pLeft < _nVectors)
+        //         {
+        //             // algorithms::internal::popMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + 1,
+        //             //                                       [](const IdxValType & a, const IdxValType & b) { return a < b; });
+
+        //             IndexType i = sortedFIndicesMax->val;
+        //             algorithms::internal::popMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + _nVectors - pLeft,
+        //                                                   [](const IdxValType & a, const IdxValType & b) { return a > b; });
+        //             while (_indicator[i] || !HelperTrainSVM<algorithmFPType, cpu>::isUpper(y[i], alpha[i], cw[i]))
+        //             {
+        //                 pLeft++;
+        //                 if (pLeft == _nVectors)
+        //                 {
+        //                     break;
+        //                 }
+        //                 i = sortedFIndicesMax->val;
+        //                 algorithms::internal::popMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + _nVectors - pLeft,
+        //                                                       [](const IdxValType & a, const IdxValType & b) { return a > b; });
+
+        //                 // algorithms::internal::popMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + 1,
+        //                 //                                       [](const IdxValType & a, const IdxValType & b) { return a < b; });
+        //             }
+        //             if (pLeft < _nVectors)
+        //             {
+        //                 _wsIndices[_nSelected] = i;
+        //                 _indicator[i]          = true;
+        //                 ++_nSelected;
+        //             }
+        //         }
+        //     }
+        // }
+
+        // algorithms::internal::makeMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + _nVectors,
+        //                                        [](const IdxValType & a, const IdxValType & b) { return a < b; });
+        // {
+        //     int64_t pLeft = 0;
+        //     DAAL_ITTNOTIFY_SCOPED_TASK(select.select2);
+        //     while (_nSelected < _nWS && pLeft < _nVectors)
+        //     {
+        //         if (pLeft < _nVectors)
+        //         {
+        //             // algorithms::internal::popMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + 1,
+        //             //                                       [](const IdxValType & a, const IdxValType & b) { return a < b; });
+
+        //             IndexType i = sortedFIndicesMax->val;
+        //             algorithms::internal::popMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + _nVectors - pLeft,
+        //                                                   [](const IdxValType & a, const IdxValType & b) { return a < b; });
+        //             // printf("%d %.1lf\n", (int)i, sortedFIndicesMax->key);
+        //             // ++sortedFIndicesMax;
+        //             // IndexType i = sortedFIndices[pLeft].val;
+        //             while (_indicator[i] || !HelperTrainSVM<algorithmFPType, cpu>::isLower(y[i], alpha[i], cw[i]))
+        //             {
+        //                 pLeft++;
+        //                 if (pLeft == _nVectors)
+        //                 {
+        //                     break;
+        //                 }
+        //                 i = sortedFIndicesMax->val;
+        //                 algorithms::internal::popMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + _nVectors - pLeft,
+        //                                                       [](const IdxValType & a, const IdxValType & b) { return a < b; });
+
+        //                 // algorithms::internal::popMaxHeap<cpu>(sortedFIndicesMax, sortedFIndicesMax + 1,
+        //                 //                                       [](const IdxValType & a, const IdxValType & b) { return a < b; });
+        //                 // printf("%d %.1lf\n", (int)i, sortedFIndicesMax->key);
+        //                 // ++sortedFIndicesMax;
+        //             }
+        //             if (pLeft < _nVectors)
+        //             {
+        //                 _wsIndices[_nSelected] = i;
+        //                 _indicator[i]          = true;
+        //                 ++_nSelected;
+        //             }
+        //         }
+        //     }
+        // }
+
+        // for (size_t i = 0; i < nWS; i++)
+        // {
+        //     printf(" \n", );
+        // }
+
         {
-            if (pLeft < _nVectors)
+            DAAL_ITTNOTIFY_SCOPED_TASK(select.qSortByKey);
+
+            algorithms::internal::qSortByKey<IdxValType, cpu>(_nVectors, sortedFIndices);
+        }
+
+        {
+            int64_t pLeft  = 0;
+            int64_t pRight = _nVectors - 1;
+            DAAL_ITTNOTIFY_SCOPED_TASK(select.select);
+            while (_nSelected < _nWS && (pRight >= 0 || pLeft < _nVectors))
             {
-                IndexType i = sortedFIndices[pLeft].val;
-                while (_indicator[i] || !HelperTrainSVM<algorithmFPType, cpu>::isUpper(y[i], alpha[i], cw[i]))
-                {
-                    pLeft++;
-                    if (pLeft == _nVectors)
-                    {
-                        break;
-                    }
-                    i = sortedFIndices[pLeft].val;
-                }
                 if (pLeft < _nVectors)
                 {
-                    _wsIndices[_nSelected] = i;
-                    _indicator[i]          = true;
-                    ++_nSelected;
-                }
-            }
-
-            if (pRight >= 0)
-            {
-                IndexType i = sortedFIndices[pRight].val;
-                while (_indicator[i] || !HelperTrainSVM<algorithmFPType, cpu>::isLower(y[i], alpha[i], cw[i]))
-                {
-                    pRight--;
-                    if (pRight == -1)
+                    IndexType i = sortedFIndices[pLeft].val;
+                    while (_indicator[i] || !HelperTrainSVM<algorithmFPType, cpu>::isUpper(y[i], alpha[i], cw[i]))
                     {
-                        break;
+                        pLeft++;
+                        if (pLeft == _nVectors)
+                        {
+                            break;
+                        }
+                        i = sortedFIndices[pLeft].val;
                     }
-                    i = sortedFIndices[pRight].val;
+                    if (pLeft < _nVectors)
+                    {
+                        _wsIndices[_nSelected] = i;
+                        _indicator[i]          = true;
+                        ++_nSelected;
+                    }
                 }
+
                 if (pRight >= 0)
                 {
-                    _wsIndices[_nSelected] = i;
-                    _indicator[i]          = true;
-                    ++_nSelected;
+                    IndexType i = sortedFIndices[pRight].val;
+                    while (_indicator[i] || !HelperTrainSVM<algorithmFPType, cpu>::isLower(y[i], alpha[i], cw[i]))
+                    {
+                        pRight--;
+                        if (pRight == -1)
+                        {
+                            break;
+                        }
+                        i = sortedFIndices[pRight].val;
+                    }
+                    if (pRight >= 0)
+                    {
+                        _wsIndices[_nSelected] = i;
+                        _indicator[i]          = true;
+                        ++_nSelected;
+                    }
                 }
             }
         }
-
         // For cases, when weights are zero
-        pLeft = 0;
+        int64_t pLeft = 0;
         while (_nSelected < _nWS)
         {
             if (!_indicator[pLeft])

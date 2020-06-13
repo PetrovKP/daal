@@ -33,6 +33,9 @@
 #include "externals/service_service.h"
 #include "data_management/data/soa_numeric_table.h"
 
+#include <list>
+#include <unordered_map>
+
 namespace daal
 {
 namespace algorithms
@@ -70,119 +73,198 @@ protected:
     const kernel_function::KernelIfacePtr _kernel; /*!< Kernel function */
 };
 
-/**
- * No cache: kernel function values are not cached
- */
-template <typename algorithmFPType, CpuType cpu>
-class SVMCache<thunder, noCache, algorithmFPType, cpu> : public SVMCacheIface<thunder, algorithmFPType, cpu>
+template <CpuType cpu, typename TKey>
+class LRUcache
 {
-    using super    = SVMCacheIface<thunder, algorithmFPType, cpu>;
-    using thisType = SVMCache<thunder, noCache, algorithmFPType, cpu>;
-    using super::_kernel;
-    using super::_lineSize;
-    using super::_cacheSize;
-
 public:
-    ~SVMCache() {}
-
-    DAAL_NEW_DELETE();
-
-    static SVMCachePtr<thunder, algorithmFPType, cpu> create(const size_t cacheSize, const size_t nSize, const size_t lineSize,
-                                                             const NumericTablePtr & xTable, const kernel_function::KernelIfacePtr & kernel,
-                                                             services::Status & status)
+    LRUcache(const size_t capacity)
     {
-        services::SharedPtr<thisType> res = services::SharedPtr<thisType>(new thisType(cacheSize, nSize, lineSize, xTable, kernel));
-        if (!res)
+        _freeIndexCache = -1;
+        this->count_    = 0;
+        this->capacity_ = capacity;
+        _head           = nullptr;
+        _tail           = nullptr;
+    }
+
+    ~LRUcache()
+    {
+        LRUNode * curr = _head;
+        printf("~LRUcache()\n");
+        while (curr != NULL)
         {
-            status.add(ErrorMemoryAllocationFailed);
+            LRUNode * next = curr->next;
+            delete curr;
+            curr = next;
+        }
+    }
+
+    void put(TKey key)
+    {
+        if (_hashmap.find(key) != _hashmap.end())
+        {
+            printf("[put] key %d count_ %d\n", (int)key, (int)count_);
+            DAAL_ASSERT(false);
+            // Если есть
+            LRUNode * node = _hashmap[key];
+
+            node->prev->next = node->next;
+            enqueue(node);
         }
         else
         {
-            status = res->init(cacheSize);
-            if (!status)
+            LRUNode * node = LRUNode::create(key, _freeIndexCache + 1);
+            // enqueue(node);
+
+            if (_head)
             {
-                res.reset();
+                _head->prev = node;
+                node->next  = _head;
+                _head       = node;
             }
+            else
+            {
+                _head = node;
+                _tail = node;
+            }
+
+            if (count_ == capacity_)
+            {
+                const int64_t freeIndex = dequeue();
+                node->setValue(freeIndex);
+                _freeIndexCache = freeIndex;
+            }
+            else
+            {
+                ++_freeIndexCache;
+            }
+            // if (_freeIndexCache >= 1024)
+            // {
+            //     printf("_freeIndexCache %d key %d count_ %d\n", (int)_freeIndexCache, (int)key, (int)count_);
+            // }
+            _hashmap[key] = node;
+            ++count_;
         }
-        return SVMCachePtr<thunder, algorithmFPType, cpu>(res);
     }
 
-    services::Status getRowsBlock(const uint32_t * indices, const size_t n, NumericTablePtr & block) override
+    int64_t getFreeIndex() const { return _freeIndexCache; }
+
+    int64_t get(TKey key)
     {
-        services::Status status;
-
-        uint32_t * indicesNew = const_cast<uint32_t *>(indices);
-        if (_isComputeSubKernel)
+        if (_hashmap.find(key) != _hashmap.end())
         {
-            indicesNew = indicesNew + _nSelectRows;
-        }
+            LRUNode * node = _hashmap[key];
+            if (node != _head && _head != _tail)
+            {
+                // printf("[get] key %d count_ %d value %d\n", (int)key, (int)count_, (int)node->getValue());
+                if (node == _tail)
+                {
+                    _tail = node->prev;
+                }
+                LRUNode * prev = node->prev;
+                if (prev)
+                {
+                    prev->next = node->next;
+                }
+                if (node->next)
+                {
+                    node->next->prev = prev;
+                }
+                node->prev  = nullptr;
+                _head->prev = node;
+                node->next  = _head;
+                _head       = node;
+                _tail->next = nullptr;
+            }
 
-        DAAL_CHECK_STATUS(status, _blockTask->copyDataByIndices(indicesNew, _xTable));
-        DAAL_ITTNOTIFY_SCOPED_TASK(cacheCompute);
-        DAAL_CHECK_STATUS(status, _kernel->computeNoThrow());
-        block = _cache.get();
-        return status;
-    }
-
-    services::Status copyLastToFirst() override { return services::Status(); }
-
-protected:
-    SVMCache(const size_t cacheSize, const size_t nSize, const size_t lineSize, const NumericTablePtr & xTable,
-             const kernel_function::KernelIfacePtr & kernel)
-        : super(cacheSize, lineSize, kernel), _nSelectRows(0), _isComputeSubKernel(false), _xTable(xTable)
-    {}
-
-    services::Status reinit(const size_t nWorkElements)
-    {
-        services::Status status;
-
-        // auto kernelResultTable   = HomogenNumericTableCPU<algorithmFPType, cpu>::create(nullptr, nWorkElements, _lineSize, &status);
-        // const size_t cacheOffset = _nSelectRows * _lineSize;
-        // DAAL_CHECK_STATUS(status, kernelResultTable->setArray(_cache->getArray() + cacheOffset));
-
-        const size_t p = _xTable->getNumberOfColumns();
-        DAAL_CHECK_STATUS_VAR(status);
-
-        SubDataTaskBase<algorithmFPType, cpu> * task = nullptr;
-        if (_xTable->getDataLayout() == NumericTableIface::csrArray)
-        {
-            task = SubDataTaskCSR<algorithmFPType, cpu>::create(_xTable, nWorkElements);
+            // node->prev->next = node->next;
+            // enqueue(node);
+            return node->getValue();
         }
         else
         {
-            task = SubDataTaskDense<algorithmFPType, cpu>::create(p, nWorkElements);
+            return -1;
         }
-        DAAL_CHECK_MALLOC(task);
-        _blockTask = SubDataTaskBasePtr<algorithmFPType, cpu>(task);
-
-        DAAL_CHECK_STATUS_VAR(status);
-        _kernel->getParameter()->computationMode = kernel_function::matrixMatrix;
-
-        _kernel->getInput()->set(kernel_function::X, _xTable);
-        _kernel->getInput()->set(kernel_function::Y, _blockTask->getTableData());
-
-        kernel_function::ResultPtr shRes(new kernel_function::Result());
-        shRes->set(kernel_function::values, _cache);
-        _kernel->setResult(shRes);
-
-        return status;
     }
 
-    services::Status init(const size_t cacheSize)
+private:
+    class LRUNode
     {
-        services::Status status;
-        _cache = HomogenNumericTableCPU<algorithmFPType, cpu>::create(cacheSize, _lineSize, &status);
-        DAAL_CHECK_MALLOC(_cache.get());
-        DAAL_CHECK_STATUS(status, reinit(cacheSize));
-        return status;
+    public:
+        DAAL_NEW_DELETE();
+        static LRUNode * create(const TKey key, int64_t value)
+        {
+            auto val = new LRUNode(key, value);
+            if (val) return val;
+            delete val;
+            return nullptr;
+        }
+
+        TKey getKey() const { return key_; }
+        int64_t getValue() const { return value_; }
+
+        void setKey(const TKey key) { key_ = key; }
+        void setValue(const int64_t value) { value_ = value; }
+
+    public:
+        LRUNode * next;
+        LRUNode * prev;
+
+    private:
+        LRUNode(const TKey key, int64_t value) : key_(key), value_(value), next(nullptr), prev(nullptr) {}
+        TKey key_;
+        int64_t value_;
+    };
+
+    // ADD TO BEGIN
+    void enqueue(LRUNode * node)
+    {
+        if (!_head)
+        {
+            _head = node;
+            _tail = node;
+        }
+        else
+        {
+            node->next  = _head;
+            node->prev  = nullptr;
+            _head->prev = node;
+            _head       = node;
+        }
     }
 
-protected:
-    size_t _nSelectRows;
-    bool _isComputeSubKernel;
-    const NumericTablePtr & _xTable;
-    SubDataTaskBasePtr<algorithmFPType, cpu> _blockTask;
-    services::SharedPtr<HomogenNumericTableCPU<algorithmFPType, cpu> > _cache;
+    // REMOVE TO END
+    int64_t dequeue()
+    {
+        int64_t value = -1;
+        if (_head == _tail)
+        {
+            delete _head;
+            _head == nullptr;
+            _tail == nullptr;
+        }
+        else
+        {
+            _hashmap.erase(_tail->getKey());
+            value          = _tail->getValue();
+            LRUNode * prev = _tail->prev;
+            if (_tail->prev)
+            {
+                _tail->prev->next = nullptr;
+            }
+            delete _tail;
+            _tail = prev;
+            count_--;
+            // _tail->next = nullptr;
+        }
+        return value;
+    }
+
+    std::unordered_map<TKey, LRUNode *> _hashmap;
+    LRUNode * _head;
+    LRUNode * _tail;
+    int capacity_;
+    int count_;
+    int64_t _freeIndexCache;
 };
 
 /**
@@ -238,14 +320,45 @@ public:
 
         for (int i = 0; i < n; ++i)
         {
-            auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(_nComputeIndices));
-            kernelResultTable->template setArray<algorithmFPType>(cachei, i);
-            _kernelIndex[nCountForKernel]         = _nComputeIndices;
-            _kernelOriginalIndex[nCountForKernel] = indices[i];
-            _cacheIndex[indices[i]]               = _nComputeIndices;
-            ++nCountForKernel;
-            ++_nComputeIndices;
+            // if (_cacheIndex[indices[i]] != -1)
+            int64_t cacheIndex = _lruCache.get(indices[i]);
+            if (cacheIndex != -1)
+            {
+                // if (i < 16) printf("%d ", (int)cacheIndex);
+                // DAAL_ASSERT(cacheIndex < _cacheSize)
+                if (cacheIndex >= _cacheSize)
+                {
+                    printf("!!! FAILED cacheIndex %d \n", (int)cacheIndex);
+                    exit(0);
+                }
+
+                auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
+                kernelResultTable->template setArray<algorithmFPType>(cachei, i);
+                ++_nSelected;
+            }
+            else
+            {
+                _lruCache.put(indices[i]);
+                cacheIndex = _lruCache.getFreeIndex();
+
+                if (cacheIndex >= _cacheSize)
+                {
+                    printf("!!! FAILED[2] cacheIndex %d \n", (int)cacheIndex);
+                    exit(0);
+                }
+
+                // DAAL_ASSERT(cacheIndex < _cacheSize)
+                auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
+                kernelResultTable->template setArray<algorithmFPType>(cachei, i);
+                // if (i >= n - 16) printf("%d ", (int)cacheIndex);
+                _kernelIndex[nCountForKernel]         = cacheIndex;
+                _kernelOriginalIndex[nCountForKernel] = indices[i];
+                // _cacheIndex[indices[i]]               = _nComputeIndices;
+                ++nCountForKernel;
+                ++_nComputeIndices;
+            }
         }
+        // printf("\n");
 
         // printf("\n nCountForKernel %lu _nComputeIndices %lu _nSelected %lu\n", nCountForKernel, _nComputeIndices, _nSelected);
 
@@ -262,7 +375,7 @@ public:
 
 protected:
     SVMCache(const size_t cacheSize, const size_t lineSize, const NumericTablePtr & xTable, const kernel_function::KernelIfacePtr & kernel)
-        : super(cacheSize, lineSize, kernel), _nSelected(0), _nComputeIndices(0), _xTable(xTable)
+        : super(cacheSize, lineSize, kernel), _lruCache(cacheSize), _nSelected(0), _nComputeIndices(0), _xTable(xTable)
     {}
 
     services::Status computeKernel(const size_t nWorkElements, const uint32_t * indices)
@@ -273,7 +386,7 @@ protected:
 
         _kernelComputeTable = SOANumericTable::create(nWorkElements, _lineSize, DictionaryIface::FeaturesEqual::equal, &status);
 
-        printf(">> [computeKernel] _nSelected %lu nWorkElements %lu\n", _nSelected, nWorkElements);
+        // printf(">> [computeKernel] _nSelected %lu nWorkElements %lu\n", _nSelected, nWorkElements);
 
         for (size_t i = 0; i < nWorkElements; ++i)
         {
@@ -314,9 +427,11 @@ protected:
         shRes->set(kernel_function::values, _kernelComputeTable);
         _kernel->setResult(shRes);
         // printf(">> [reinit - start] _kernel->computeNoThrow(\n");
-        DAAL_ITTNOTIFY_SCOPED_TASK(cache.getRowsBlock.computeKernel.compute);
 
-        DAAL_CHECK_STATUS(status, _kernel->computeNoThrow());
+        {
+            DAAL_ITTNOTIFY_SCOPED_TASK(cache.getRowsBlock.computeKernel.compute);
+            DAAL_CHECK_STATUS(status, _kernel->computeNoThrow());
+        }
         // printf(">> [reinit - finish] _kernel->computeNoThrow(\n");
 
         // ReadRows<algorithmFPType, cpu> mtData(kernelComputeTable.get(), 0, 2);
@@ -347,12 +462,11 @@ protected:
 
         _cache = SOANumericTable::create(dict, _lineSize, NumericTable::AllocationFlag::doAllocate, &status);
         DAAL_CHECK_STATUS_VAR(status);
-        // _cache.reset(_lineSize * _cacheSize);
-        // DAAL_CHECK_STATUS(status, reinit(nSize));
         return status;
     }
 
 protected:
+    LRUcache<cpu, size_t> _lruCache;
     size_t _nSelected;
     size_t _nComputeIndices;
     const NumericTablePtr & _xTable;
