@@ -21,7 +21,7 @@
 #include "service/kernel/data_management/service_numeric_table.h"
 #include "externals/service_ittnotify.h"
 #include "service/kernel/service_utils.h"
-#include "algorithms/kernel/service_hash_map.h"
+#include "algorithms/kernel/service_hash_table.h"
 
 namespace daal
 {

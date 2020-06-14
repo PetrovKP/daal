@@ -21,8 +21,8 @@
 //--
 */
 
-#ifndef __SERVICE_HASH_MAP_H__
-#define __SERVICE_HASH_MAP_H__
+#ifndef __SERVICE_HASH_TABLE_H__
+#define __SERVICE_HASH_TABLE_H__
 
 #include "services/internal/error_handling_helpers.h"
 #include "services/error_indexes.h"

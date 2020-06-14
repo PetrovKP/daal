@@ -193,17 +193,11 @@ services::Status SVMTrainImpl<thunder, algorithmFPType, ParameterType, cpu>::com
     {
         if (iter != 0)
         {
-            DAAL_ITTNOTIFY_SCOPED_TASK(copyLastToFirst);
-
             DAAL_CHECK_STATUS(status, workSet.copyLastToFirst());
-
-            DAAL_CHECK_STATUS(status, cachePtr->copyLastToFirst());
         }
 
-        {
-            DAAL_CHECK_STATUS(status, workSet.select(y, alpha, grad, cw));
-        }
-        const uint32_t * wsIndices = workSet.getIndices();
+        DAAL_CHECK_STATUS(status, workSet.select(y, alpha, grad, cw));
+        const uint32_t * const wsIndices = workSet.getIndices();
         NumericTablePtr kernelWS;
         {
             DAAL_ITTNOTIFY_SCOPED_TASK(getRowsBlock);

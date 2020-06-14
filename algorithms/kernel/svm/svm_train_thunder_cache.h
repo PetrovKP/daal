@@ -54,9 +54,7 @@ class SVMCacheIface<thunder, algorithmFPType, cpu> : public SVMCacheCommonIface<
 public:
     virtual ~SVMCacheIface() {}
 
-    virtual services::Status getRowsBlock(const uint32_t * indices, const size_t n, NumericTablePtr & block) = 0;
-
-    virtual services::Status copyLastToFirst() = 0;
+    virtual services::Status getRowsBlock(const uint32_t * const indices, const size_t n, NumericTablePtr & block) = 0;
 
     virtual size_t getDataRowIndex(size_t rowIndex) const override { return rowIndex; }
 
@@ -107,19 +105,13 @@ public:
         return SVMCachePtr<thunder, algorithmFPType, cpu>(res);
     }
 
-    services::Status copyLastToFirst() override { return services::Status(); }
-
-    services::Status getRowsBlock(const uint32_t * indices, const size_t n, NumericTablePtr & block) override
+    services::Status getRowsBlock(const uint32_t * const indices, const size_t n, NumericTablePtr & block) override
     {
         DAAL_ITTNOTIFY_SCOPED_TASK(cache.getRowsBlock);
 
-        // for (int i = 0; i < 16; i++) printf("%d ", (int)indices[i]);
-        // printf("\n");
-
         services::Status status;
-        auto kernelResultTable = SOANumericTable::create(n, _lineSize, DictionaryIface::FeaturesEqual::equal, &status);
-        _nSelected             = 0;
-        size_t nCountForKernel = 0;
+        auto kernelResultTable   = SOANumericTable::create(n, _lineSize, DictionaryIface::FeaturesEqual::equal, &status);
+        size_t nIndicesForKernel = 0;
 
         for (int i = 0; i < n; ++i)
         {
@@ -127,10 +119,8 @@ public:
             if (cacheIndex != -1)
             {
                 DAAL_ASSERT(cacheIndex < _cacheSize)
-
                 auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
                 kernelResultTable->template setArray<algorithmFPType>(cachei, i);
-                ++_nSelected;
             }
             else
             {
@@ -140,10 +130,9 @@ public:
                 auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
                 kernelResultTable->template setArray<algorithmFPType>(cachei, i);
                 // if (i >= n - 16) printf("%d ", (int)cacheIndex);
-                _kernelIndex[nCountForKernel]         = cacheIndex;
-                _kernelOriginalIndex[nCountForKernel] = indices[i];
-                ++nCountForKernel;
-                ++_nComputeIndices;
+                _kernelIndex[nIndicesForKernel]         = cacheIndex;
+                _kernelOriginalIndex[nIndicesForKernel] = indices[i];
+                ++nIndicesForKernel;
             }
         }
         // printf("\n");
@@ -152,9 +141,9 @@ public:
 
         // for (int i = 0; i < 16; i++) printf("%d ", (int)_kernelIndex[i]);
         // printf("\n");
-        if (nCountForKernel != 0)
+        if (nIndicesForKernel != 0)
         {
-            DAAL_CHECK_STATUS(status, computeKernel(nCountForKernel, _kernelOriginalIndex.get()));
+            DAAL_CHECK_STATUS(status, computeKernel(nIndicesForKernel, _kernelOriginalIndex.get()));
         }
         // printf("> [reinit] - finish\n");
         block = kernelResultTable;
@@ -163,7 +152,7 @@ public:
 
 protected:
     SVMCache(const size_t cacheSize, const size_t lineSize, const NumericTablePtr & xTable, const kernel_function::KernelIfacePtr & kernel)
-        : super(cacheSize, lineSize, kernel), _lruCache(cacheSize), _nSelected(0), _nComputeIndices(0), _xTable(xTable)
+        : super(cacheSize, lineSize, kernel), _lruCache(cacheSize), _xTable(xTable)
     {}
 
     services::Status computeKernel(const size_t nWorkElements, const uint32_t * indices)
@@ -249,8 +238,6 @@ protected:
 
 protected:
     LRUCache<cpu, uint32_t> _lruCache;
-    size_t _nSelected;
-    size_t _nComputeIndices;
     const NumericTablePtr & _xTable;
     SubDataTaskBasePtr<algorithmFPType, cpu> _blockTask;
     TArray<uint32_t, cpu> _kernelOriginalIndex;
