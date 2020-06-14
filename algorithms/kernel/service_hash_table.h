@@ -1,4 +1,4 @@
-/* file: hash_table.h */
+/* file: service_hash_table.h */
 /*******************************************************************************
 * Copyright 2020 Intel Corporation
 *
