@@ -391,7 +391,40 @@ public:
     template <typename T>
     services::Status setArray(const services::SharedPtr<T> & ptr, size_t idx)
     {
-        return SOANumericTable::setArray<T>(ptr, idx);
+        if (_partialMemStatus != notAllocated && _partialMemStatus != userAllocated)
+        {
+            return services::Status(services::ErrorIncorrectNumberOfFeatures);
+        }
+
+        if (idx < getNumberOfColumns() && idx < _arrays.size())
+        {
+            _ddict->setFeature<T>(idx);
+
+            if (!_arrays[idx] && ptr)
+            {
+                _arraysInitialized++;
+            }
+
+            if (_arrays[idx] && !ptr)
+            {
+                _arraysInitialized--;
+            }
+
+            _arrays[idx] = services::reinterpretPointerCast<byte, T>(ptr);
+        }
+        else
+        {
+            return services::Status(services::ErrorIncorrectNumberOfFeatures);
+        }
+
+        _partialMemStatus = userAllocated;
+
+        if (_arraysInitialized == getNumberOfColumns())
+        {
+            _memStatus = userAllocated;
+        }
+        DAAL_CHECK_STATUS_VAR(generatesOffsets())
+        return services::Status();
     }
 
     virtual ~SOANumericTableCPU() {}
