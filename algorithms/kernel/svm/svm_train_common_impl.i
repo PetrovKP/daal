@@ -139,6 +139,106 @@ void HelperTrainSVM<algorithmFPType, cpu>::WSSjLocal(const size_t jStart, const 
     WSSjLocalBaseline(jStart, jEnd, KiBlock, kernelDiag, grad, I, GMin, Kii, tau, Bj, GMax, GMax2, delta);
 }
 
+template <CpuType cpu, typename TKey>
+void LRUCache<cpu, TKey>::put(const TKey key)
+{
+    LRUNode * node = nullptr;
+    if (_hashmap.find(key, node))
+    {
+        enqueue(node);
+    }
+    else
+    {
+        node = LRUNode::create(key, _freeIndexCache + 1);
+        if (!node) return;
+        enqueue(node);
+        if (_count == _capacity)
+        {
+            const int64_t freeIndex = dequeue();
+            node->setValue(freeIndex);
+            _freeIndexCache = freeIndex;
+        }
+        else
+        {
+            ++_freeIndexCache;
+        }
+        _hashmap.insert(key, node);
+        ++_count;
+    }
+}
+
+template <CpuType cpu, typename TKey>
+int64_t LRUCache<cpu, TKey>::get(const TKey key)
+{
+    LRUNode * node = nullptr;
+    if (_hashmap.find(key, node))
+    {
+        enqueue(node);
+        return node->getValue();
+    }
+    else
+    {
+        return -1;
+    }
+}
+
+template <CpuType cpu, typename TKey>
+void LRUCache<cpu, TKey>::enqueue(LRUNode * node)
+{
+    if (!_head)
+    {
+        _head = node;
+        _tail = node;
+    }
+    else if (node != _head)
+    {
+        if (node == _tail)
+        {
+            _tail = node->prev;
+        }
+        LRUNode * prev = node->prev;
+        if (prev)
+        {
+            prev->next = node->next;
+        }
+        if (node->next)
+        {
+            node->next->prev = prev;
+        }
+        _head->prev = node;
+        node->next  = _head;
+        _head       = node;
+        _head->prev = nullptr;
+        _tail->next = nullptr;
+    }
+}
+
+template <CpuType cpu, typename TKey>
+int64_t LRUCache<cpu, TKey>::dequeue()
+{
+    int64_t value = -1;
+    if (_head == _tail)
+    {
+        delete _head;
+        _head == nullptr;
+        _tail == nullptr;
+    }
+    else
+    {
+        _hashmap.erase(_tail->getKey());
+        value          = _tail->getValue();
+        LRUNode * prev = _tail->prev;
+        if (_tail->prev)
+        {
+            _tail->prev->next = nullptr;
+        }
+        delete _tail;
+        _tail = prev;
+        --_count;
+    }
+    return value;
+}
+
 template <typename algorithmFPType, CpuType cpu>
 services::Status SubDataTaskCSR<algorithmFPType, cpu>::copyDataByIndices(const uint32_t * wsIndices, const NumericTablePtr & xTable)
 {

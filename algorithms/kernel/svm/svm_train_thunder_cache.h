@@ -33,9 +33,6 @@
 #include "externals/service_service.h"
 #include "data_management/data/soa_numeric_table.h"
 
-#include <list>
-#include <unordered_map>
-
 namespace daal
 {
 namespace algorithms
@@ -71,200 +68,6 @@ protected:
     const size_t _lineSize;                        /*!< Number of elements in the cache line */
     const size_t _cacheSize;                       /*!< Number of cache lines */
     const kernel_function::KernelIfacePtr _kernel; /*!< Kernel function */
-};
-
-template <CpuType cpu, typename TKey>
-class LRUcache
-{
-public:
-    LRUcache(const size_t capacity)
-    {
-        _freeIndexCache = -1;
-        this->count_    = 0;
-        this->capacity_ = capacity;
-        _head           = nullptr;
-        _tail           = nullptr;
-    }
-
-    ~LRUcache()
-    {
-        LRUNode * curr = _head;
-        printf("~LRUcache()\n");
-        while (curr != NULL)
-        {
-            LRUNode * next = curr->next;
-            delete curr;
-            curr = next;
-        }
-    }
-
-    void put(TKey key)
-    {
-        if (_hashmap.find(key) != _hashmap.end())
-        {
-            printf("[put] key %d count_ %d\n", (int)key, (int)count_);
-            DAAL_ASSERT(false);
-            // Если есть
-            LRUNode * node = _hashmap[key];
-
-            node->prev->next = node->next;
-            enqueue(node);
-        }
-        else
-        {
-            LRUNode * node = LRUNode::create(key, _freeIndexCache + 1);
-            // enqueue(node);
-
-            if (_head)
-            {
-                _head->prev = node;
-                node->next  = _head;
-                _head       = node;
-            }
-            else
-            {
-                _head = node;
-                _tail = node;
-            }
-
-            if (count_ == capacity_)
-            {
-                const int64_t freeIndex = dequeue();
-                node->setValue(freeIndex);
-                _freeIndexCache = freeIndex;
-            }
-            else
-            {
-                ++_freeIndexCache;
-            }
-            // if (_freeIndexCache >= 1024)
-            // {
-            //     printf("_freeIndexCache %d key %d count_ %d\n", (int)_freeIndexCache, (int)key, (int)count_);
-            // }
-            _hashmap[key] = node;
-            ++count_;
-        }
-    }
-
-    int64_t getFreeIndex() const { return _freeIndexCache; }
-
-    int64_t get(TKey key)
-    {
-        if (_hashmap.find(key) != _hashmap.end())
-        {
-            LRUNode * node = _hashmap[key];
-            if (node != _head && _head != _tail)
-            {
-                // printf("[get] key %d count_ %d value %d\n", (int)key, (int)count_, (int)node->getValue());
-                if (node == _tail)
-                {
-                    _tail = node->prev;
-                }
-                LRUNode * prev = node->prev;
-                if (prev)
-                {
-                    prev->next = node->next;
-                }
-                if (node->next)
-                {
-                    node->next->prev = prev;
-                }
-                node->prev  = nullptr;
-                _head->prev = node;
-                node->next  = _head;
-                _head       = node;
-                _tail->next = nullptr;
-            }
-
-            // node->prev->next = node->next;
-            // enqueue(node);
-            return node->getValue();
-        }
-        else
-        {
-            return -1;
-        }
-    }
-
-private:
-    class LRUNode
-    {
-    public:
-        DAAL_NEW_DELETE();
-        static LRUNode * create(const TKey key, int64_t value)
-        {
-            auto val = new LRUNode(key, value);
-            if (val) return val;
-            delete val;
-            return nullptr;
-        }
-
-        TKey getKey() const { return key_; }
-        int64_t getValue() const { return value_; }
-
-        void setKey(const TKey key) { key_ = key; }
-        void setValue(const int64_t value) { value_ = value; }
-
-    public:
-        LRUNode * next;
-        LRUNode * prev;
-
-    private:
-        LRUNode(const TKey key, int64_t value) : key_(key), value_(value), next(nullptr), prev(nullptr) {}
-        TKey key_;
-        int64_t value_;
-    };
-
-    // ADD TO BEGIN
-    void enqueue(LRUNode * node)
-    {
-        if (!_head)
-        {
-            _head = node;
-            _tail = node;
-        }
-        else
-        {
-            node->next  = _head;
-            node->prev  = nullptr;
-            _head->prev = node;
-            _head       = node;
-        }
-    }
-
-    // REMOVE TO END
-    int64_t dequeue()
-    {
-        int64_t value = -1;
-        if (_head == _tail)
-        {
-            delete _head;
-            _head == nullptr;
-            _tail == nullptr;
-        }
-        else
-        {
-            _hashmap.erase(_tail->getKey());
-            value          = _tail->getValue();
-            LRUNode * prev = _tail->prev;
-            if (_tail->prev)
-            {
-                _tail->prev->next = nullptr;
-            }
-            delete _tail;
-            _tail = prev;
-            count_--;
-            // _tail->next = nullptr;
-        }
-        return value;
-    }
-
-    std::unordered_map<TKey, LRUNode *> _hashmap;
-    LRUNode * _head;
-    LRUNode * _tail;
-    int capacity_;
-    int count_;
-    int64_t _freeIndexCache;
 };
 
 /**
@@ -320,17 +123,10 @@ public:
 
         for (int i = 0; i < n; ++i)
         {
-            // if (_cacheIndex[indices[i]] != -1)
             int64_t cacheIndex = _lruCache.get(indices[i]);
             if (cacheIndex != -1)
             {
-                // if (i < 16) printf("%d ", (int)cacheIndex);
-                // DAAL_ASSERT(cacheIndex < _cacheSize)
-                if (cacheIndex >= _cacheSize)
-                {
-                    printf("!!! FAILED cacheIndex %d \n", (int)cacheIndex);
-                    exit(0);
-                }
+                DAAL_ASSERT(cacheIndex < _cacheSize)
 
                 auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
                 kernelResultTable->template setArray<algorithmFPType>(cachei, i);
@@ -340,20 +136,12 @@ public:
             {
                 _lruCache.put(indices[i]);
                 cacheIndex = _lruCache.getFreeIndex();
-
-                if (cacheIndex >= _cacheSize)
-                {
-                    printf("!!! FAILED[2] cacheIndex %d \n", (int)cacheIndex);
-                    exit(0);
-                }
-
-                // DAAL_ASSERT(cacheIndex < _cacheSize)
+                DAAL_ASSERT(cacheIndex < _cacheSize)
                 auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
                 kernelResultTable->template setArray<algorithmFPType>(cachei, i);
                 // if (i >= n - 16) printf("%d ", (int)cacheIndex);
                 _kernelIndex[nCountForKernel]         = cacheIndex;
                 _kernelOriginalIndex[nCountForKernel] = indices[i];
-                // _cacheIndex[indices[i]]               = _nComputeIndices;
                 ++nCountForKernel;
                 ++_nComputeIndices;
             }
@@ -445,33 +233,26 @@ protected:
     services::Status init(const size_t nSize)
     {
         services::Status status;
-        auto dict = NumericTableDictionaryPtr(new NumericTableDictionary(_cacheSize));
         printf("cacheSize %lu _lineSize %lu nSize %lu\n", _cacheSize, _lineSize, nSize);
-        _cacheIndex.reset(_cacheSize);
-        DAAL_CHECK_MALLOC(_cacheIndex.get());
         _kernelIndex.reset(nSize);
         DAAL_CHECK_MALLOC(_kernelIndex.get());
         _kernelOriginalIndex.reset(nSize);
         DAAL_CHECK_MALLOC(_kernelOriginalIndex.get());
 
-        for (size_t i = 0; i < _cacheSize; ++i)
-        {
-            dict->setFeature<algorithmFPType>(i);
-            _cacheIndex[i] = -1;
-        }
-
+        auto dict = NumericTableDictionary::create(_cacheSize, DictionaryIface::FeaturesEqual::equal, &status);
+        DAAL_CHECK_STATUS_VAR(status);
+        DAAL_CHECK_STATUS(status, dict->template setAllFeatures<algorithmFPType>());
         _cache = SOANumericTable::create(dict, _lineSize, NumericTable::AllocationFlag::doAllocate, &status);
         DAAL_CHECK_STATUS_VAR(status);
         return status;
     }
 
 protected:
-    LRUcache<cpu, size_t> _lruCache;
+    LRUCache<cpu, uint32_t> _lruCache;
     size_t _nSelected;
     size_t _nComputeIndices;
     const NumericTablePtr & _xTable;
     SubDataTaskBasePtr<algorithmFPType, cpu> _blockTask;
-    TArray<int, cpu> _cacheIndex;
     TArray<uint32_t, cpu> _kernelOriginalIndex;
     TArray<uint32_t, cpu> _kernelIndex;
     services::SharedPtr<SOANumericTable> _cache;

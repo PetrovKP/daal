@@ -21,6 +21,7 @@
 #include "service/kernel/data_management/service_numeric_table.h"
 #include "externals/service_ittnotify.h"
 #include "service/kernel/service_utils.h"
+#include "algorithms/kernel/service_hash_map.h"
 
 namespace daal
 {
@@ -67,6 +68,74 @@ private:
                                                    const algorithmFPType * kernelDiag, const algorithmFPType * grad, const char * I,
                                                    const algorithmFPType GMin, const algorithmFPType Kii, const algorithmFPType tau, int & Bj,
                                                    algorithmFPType & GMax, algorithmFPType & GMax2, algorithmFPType & delta);
+};
+
+template <CpuType cpu, typename TKey>
+class LRUCache
+{
+public:
+    LRUCache(const size_t capacity) : _capacity(capacity), _hashmap(capacity * 10)
+    {
+        _freeIndexCache = -1;
+        _count          = 0;
+        _head           = nullptr;
+        _tail           = nullptr;
+    }
+
+    ~LRUCache()
+    {
+        LRUNode * curr = _head;
+        while (curr)
+        {
+            LRUNode * next = curr->next;
+            delete curr;
+            curr = next;
+        }
+    }
+
+    void put(const TKey key);
+    int64_t getFreeIndex() const { return _freeIndexCache; }
+    int64_t get(const TKey key);
+
+private:
+    class LRUNode
+    {
+    public:
+        DAAL_NEW_DELETE();
+        static LRUNode * create(const TKey key, int64_t value)
+        {
+            auto val = new LRUNode(key, value);
+            if (val) return val;
+            delete val;
+            return nullptr;
+        }
+
+        TKey getKey() const { return key_; }
+        int64_t getValue() const { return value_; }
+
+        void setKey(const TKey key) { key_ = key; }
+        void setValue(const int64_t value) { value_ = value; }
+
+    public:
+        LRUNode * next;
+        LRUNode * prev;
+
+    private:
+        LRUNode(const TKey key, int64_t value) : key_(key), value_(value), next(nullptr), prev(nullptr) {}
+        TKey key_;
+        int64_t value_;
+    };
+
+    const size_t _capacity;
+    algorithms::internal::HashTable<cpu, TKey, LRUNode *> _hashmap;
+    LRUNode * _head;
+    LRUNode * _tail;
+    size_t _count;
+    int64_t _freeIndexCache;
+
+private:
+    void enqueue(LRUNode * node);
+    int64_t dequeue();
 };
 
 template <typename algorithmFPType, CpuType cpu>

@@ -28,8 +28,6 @@
 #include "algorithms/kernel/service_sort.h"
 #include "algorithms/kernel/service_heap.h"
 
-#include <algorithm>
-
 namespace daal
 {
 namespace algorithms
@@ -47,17 +45,15 @@ struct TaskWorkingSet
 {
     using IndexType = uint32_t;
 
-    TaskWorkingSet(const size_t nVectors, const size_t maxWS) : _nVectors(nVectors), _maxWS(maxWS) {}
+    TaskWorkingSet(const size_t nNonZeroWeights, const size_t nVectors, const size_t maxWS)
+        : _nNonZeroWeights(nNonZeroWeights), _nVectors(nVectors), _maxWS(maxWS)
+    {}
 
     struct IdxValType
     {
         algorithmFPType key;
         IndexType val;
-        static int compare(const void * a, const void * b)
-        {
-            if (static_cast<const IdxValType *>(a)->key < static_cast<const IdxValType *>(b)->key) return -1;
-            return static_cast<const IdxValType *>(a)->key > static_cast<const IdxValType *>(b)->key;
-        }
+
         bool operator<(const IdxValType & o) const { return key < o.key; }
         bool operator>(const IdxValType & o) const { return key > o.key; }
     };
@@ -72,7 +68,7 @@ struct TaskWorkingSet
         DAAL_CHECK_MALLOC(_indicator.get());
         services::internal::service_memset_seq<bool, cpu>(_indicator.get(), false, _nVectors);
 
-        _nWS       = services::internal::min<cpu, algorithmFPType>(maxPowTwo(_nVectors), _maxWS);
+        _nWS       = services::internal::min<cpu, algorithmFPType>(maxPowTwo(_nNonZeroWeights), _maxWS);
         _nSelected = 0;
 
         _wsIndices.reset(_nWS);
@@ -317,6 +313,7 @@ protected:
     }
 
 private:
+    size_t _nNonZeroWeights;
     size_t _nVectors;
     size_t _maxWS;
     size_t _nSelected;

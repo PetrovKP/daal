@@ -64,7 +64,7 @@ private:
     static const size_t nNoChanges = 5;
     // The maximum numbers of iteration of the subtask is number of observation in WS x cInnerIterations.
     // It's enough to find minimum for subtask.
-    static const size_t cInnerIterations = 1000;
+    static const size_t cInnerIterations = 100;
     // The maximum block size for blocked SMO solver.
     // Need of (maxBlockSize*5 + maxBlockSize*maxBlockSize)*sizeof(algorithmFPType) internal memory.
     // It should get into the cache L2 (~1MB).
