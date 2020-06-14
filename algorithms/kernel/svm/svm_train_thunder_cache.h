@@ -68,7 +68,7 @@ protected:
 };
 
 /**
- * No cache: kernel function values are not cached
+ * LRU cache: kernel function values are cached
  */
 template <typename algorithmFPType, CpuType cpu>
 class SVMCache<thunder, lruCache, algorithmFPType, cpu> : public SVMCacheIface<thunder, algorithmFPType, cpu>
@@ -117,7 +117,7 @@ public:
                 int64_t cacheIndex = _lruCache.get(indices[i]);
                 if (cacheIndex != -1)
                 {
-                    // If work index in cache
+                    // If index in cache
                     DAAL_ASSERT(cacheIndex < _cacheSize)
                     auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
                     kernelResultTable->template setArray<algorithmFPType>(cachei, i);
@@ -135,12 +135,6 @@ public:
                 }
             }
         }
-        // printf("\n");
-
-        // printf("\n nCountForKernel %lu _nComputeIndices %lu _nSelected %lu\n", nCountForKernel, _nComputeIndices, _nSelected);
-
-        // for (int i = 0; i < 16; i++) printf("%d ", (int)_kernelIndex[i]);
-        // printf("\n");
         if (nIndicesForKernel != 0)
         {
             DAAL_CHECK_STATUS(status, computeKernel(nIndicesForKernel, _kernelOriginalIndex.get()));
@@ -158,14 +152,14 @@ protected:
     {
         services::Status status;
         auto kernelComputeTable = SOANumericTableCPU<cpu>::create(nWorkElements, _lineSize, DictionaryIface::FeaturesEqual::equal, &status);
+        DAAL_CHECK_STATUS_VAR(status);
+
         for (size_t i = 0; i < nWorkElements; ++i)
         {
             const size_t cacheIndex = _kernelIndex[i];
             auto cachei             = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
             kernelComputeTable->template setArray<algorithmFPType>(cachei, i);
         }
-
-        DAAL_CHECK_STATUS_VAR(status);
 
         DAAL_CHECK_STATUS(status, _blockTask->copyDataByIndices(indices, nWorkElements, _xTable));
 
@@ -210,7 +204,6 @@ protected:
 
         DAAL_CHECK_MALLOC(task);
         _blockTask = SubDataTaskBasePtr<algorithmFPType, cpu>(task);
-
         return status;
     }
 

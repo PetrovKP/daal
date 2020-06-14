@@ -102,33 +102,20 @@ struct TaskWorkingSet
         DAAL_ITTNOTIFY_SCOPED_TASK(select);
         services::Status status;
         IdxValType * sortedFIndices = _sortedFIndices.get();
-        {
-            DAAL_ITTNOTIFY_SCOPED_TASK(select.copy);
 
-            for (size_t i = 0; i < _nVectors; ++i)
+        const size_t blockSize = 16384;
+        const size_t nBlocks   = _nVectors / blockSize + !!(_nVectors % blockSize);
+        daal::threader_for(nBlocks, nBlocks, [&](const size_t iBlock) {
+            const size_t startRow = iBlock * blockSize;
+            const size_t endRow   = (iBlock != nBlocks - 1) ? startRow + blockSize : _nVectors;
+            for (size_t i = startRow; i < endRow; ++i)
             {
-                _sortedFIndices[i].key = f[i];
-                _sortedFIndices[i].val = i;
+                sortedFIndices[i].key = f[i];
+                sortedFIndices[i].val = i;
             }
+        });
 
-            // const size_t blockSize = 1024;
-            // const size_t nBlocks   = _nVectors / blockSize + !!(_nVectors % blockSize);
-            // daal::threader_for(nBlocks, nBlocks, [&](const size_t iBlock) {
-            //     const size_t startRow = iBlock * blockSize;
-            //     const size_t endRow   = (iBlock != nBlocks - 1) ? startRow + blockSize : _nVectors;
-            //     for (size_t i = startRow; i < endRow; ++i)
-            //     {
-            //         sortedFIndices[i].key = f[i];
-            //         sortedFIndices[i].val = i;
-            //     }
-            // });
-        }
-
-        {
-            DAAL_ITTNOTIFY_SCOPED_TASK(select.qSortByKey);
-
-            algorithms::internal::qSortByKey<IdxValType, cpu>(_nVectors, sortedFIndices);
-        }
+        algorithms::internal::qSortByKey<IdxValType, cpu>(_nVectors, sortedFIndices);
 
         {
             int64_t pLeft  = 0;
