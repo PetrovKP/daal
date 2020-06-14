@@ -474,7 +474,6 @@ protected:
         return services::Status();
     }
 
-private:
     services::Status generatesOffsets()
     {
         if (isHomogeneousFloatOrDouble() && isAllCompleted())
@@ -485,6 +484,7 @@ private:
         return services::Status();
     }
 
+private:
     bool isAllCompleted() const
     {
         const size_t ncols = getNumberOfColumns();

@@ -240,14 +240,17 @@ int64_t LRUCache<cpu, TKey>::dequeue()
 }
 
 template <typename algorithmFPType, CpuType cpu>
-services::Status SubDataTaskCSR<algorithmFPType, cpu>::copyDataByIndices(const uint32_t * wsIndices, const NumericTablePtr & xTable)
+services::Status SubDataTaskCSR<algorithmFPType, cpu>::copyDataByIndices(const uint32_t * wsIndices, const size_t nSubsetVectors,
+                                                                         const NumericTablePtr & xTable)
 {
     DAAL_ITTNOTIFY_SCOPED_TASK(cache.copyDataByIndices.CSR);
+    services::Status status;
     CSRNumericTableIface * csrIface = dynamic_cast<CSRNumericTableIface *>(const_cast<NumericTable *>(xTable.get()));
     DAAL_CHECK(csrIface, services::ErrorEmptyCSRNumericTable);
+    DAAL_CHECK_STATUS(status, this->_dataTable->resize(nSubsetVectors));
 
     _rowOffsets[0] = 1;
-    for (size_t i = 0; i < this->_nSubsetVectors; ++i)
+    for (size_t i = 0; i < nSubsetVectors; ++i)
     {
         size_t iRows = wsIndices[i];
         ReadRowsCSR<algorithmFPType, cpu> mtX(csrIface, iRows, 1);
@@ -278,12 +281,15 @@ services::Status SubDataTaskCSR<algorithmFPType, cpu>::copyDataByIndices(const u
 }
 
 template <typename algorithmFPType, CpuType cpu>
-services::Status SubDataTaskDense<algorithmFPType, cpu>::copyDataByIndices(const uint32_t * wsIndices, const NumericTablePtr & xTable)
+services::Status SubDataTaskDense<algorithmFPType, cpu>::copyDataByIndices(const uint32_t * wsIndices, const size_t nSubsetVectors,
+                                                                           const NumericTablePtr & xTable)
 {
     DAAL_ITTNOTIFY_SCOPED_TASK(cache.copyDataByIndices.Dense);
-    NumericTable & x    = *xTable.get();
-    const size_t p      = x.getNumberOfColumns();
-    const size_t nBlock = this->_nSubsetVectors;
+    services::Status status;
+    NumericTable & x = *xTable.get();
+    const size_t p   = x.getNumberOfColumns();
+    DAAL_CHECK_STATUS(status, this->_dataTable->resize(nSubsetVectors));
+    const size_t nBlock = nSubsetVectors;
 
     SafeStatus safeStat;
     daal::threader_for(nBlock, nBlock, [&](const size_t iBlock) {

@@ -145,7 +145,6 @@ public:
         {
             DAAL_CHECK_STATUS(status, computeKernel(nIndicesForKernel, _kernelOriginalIndex.get()));
         }
-        // printf("> [reinit] - finish\n");
         block = kernelResultTable;
         return status;
     }
@@ -158,51 +157,28 @@ protected:
     services::Status computeKernel(const size_t nWorkElements, const uint32_t * indices)
     {
         services::Status status;
-
+        auto kernelComputeTable = SOANumericTableCPU<cpu>::create(nWorkElements, _lineSize, DictionaryIface::FeaturesEqual::equal, &status);
+        for (size_t i = 0; i < nWorkElements; ++i)
         {
-            DAAL_ITTNOTIFY_SCOPED_TASK(cache.getRowsBlock.setKernel);
-            auto kernelComputeTable = SOANumericTableCPU<cpu>::create(nWorkElements, _lineSize, DictionaryIface::FeaturesEqual::equal, &status);
-
-            // printf(">> [computeKernel] _nSelected %lu nWorkElements %lu\n", _nSelected, nWorkElements);
-
-            for (size_t i = 0; i < nWorkElements; ++i)
-            {
-                const size_t cacheIndex = _kernelIndex[i];
-                auto cachei             = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
-                kernelComputeTable->template setArray<algorithmFPType>(cachei, i);
-            }
-
-            const size_t p = _xTable->getNumberOfColumns();
-            DAAL_CHECK_STATUS_VAR(status);
-
-            SubDataTaskBase<algorithmFPType, cpu> * task = nullptr;
-            if (_xTable->getDataLayout() == NumericTableIface::csrArray)
-            {
-                task = SubDataTaskCSR<algorithmFPType, cpu>::create(_xTable, nWorkElements);
-            }
-            else
-            {
-                task = SubDataTaskDense<algorithmFPType, cpu>::create(p, nWorkElements);
-            }
-
-            DAAL_CHECK_MALLOC(task);
-            _blockTask = SubDataTaskBasePtr<algorithmFPType, cpu>(task);
-            DAAL_CHECK_STATUS(status, _blockTask->copyDataByIndices(indices, _xTable));
-
-            DAAL_CHECK_STATUS_VAR(status);
-            _kernel->getParameter()->computationMode = kernel_function::matrixMatrix;
-
-            _kernel->getInput()->set(kernel_function::X, _xTable);
-            _kernel->getInput()->set(kernel_function::Y, _blockTask->getTableData());
-
-            kernel_function::ResultPtr shRes(new kernel_function::Result());
-            shRes->set(kernel_function::values, kernelComputeTable);
-            _kernel->setResult(shRes);
+            const size_t cacheIndex = _kernelIndex[i];
+            auto cachei             = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
+            kernelComputeTable->template setArray<algorithmFPType>(cachei, i);
         }
-        {
-            DAAL_ITTNOTIFY_SCOPED_TASK(cache.getRowsBlock.computeKernel.compute);
-            DAAL_CHECK_STATUS(status, _kernel->computeNoThrow());
-        }
+
+        DAAL_CHECK_STATUS_VAR(status);
+
+        DAAL_CHECK_STATUS(status, _blockTask->copyDataByIndices(indices, nWorkElements, _xTable));
+
+        DAAL_CHECK_STATUS_VAR(status);
+        _kernel->getParameter()->computationMode = kernel_function::matrixMatrix;
+
+        _kernel->getInput()->set(kernel_function::X, _xTable);
+        _kernel->getInput()->set(kernel_function::Y, _blockTask->getTableData());
+
+        kernel_function::ResultPtr shRes(new kernel_function::Result());
+        shRes->set(kernel_function::values, kernelComputeTable);
+        _kernel->setResult(shRes);
+        DAAL_CHECK_STATUS(status, _kernel->computeNoThrow());
 
         return status;
     }
@@ -221,6 +197,20 @@ protected:
         DAAL_CHECK_STATUS(status, dict->template setAllFeatures<algorithmFPType>());
         _cache = SOANumericTableCPU<cpu>::create(dict, _lineSize, NumericTable::AllocationFlag::doAllocate, &status);
         DAAL_CHECK_STATUS_VAR(status);
+
+        SubDataTaskBase<algorithmFPType, cpu> * task = nullptr;
+        if (_xTable->getDataLayout() == NumericTableIface::csrArray)
+        {
+            task = SubDataTaskCSR<algorithmFPType, cpu>::create(_xTable, nSize);
+        }
+        else
+        {
+            task = SubDataTaskDense<algorithmFPType, cpu>::create(_xTable->getNumberOfColumns(), nSize);
+        }
+
+        DAAL_CHECK_MALLOC(task);
+        _blockTask = SubDataTaskBasePtr<algorithmFPType, cpu>(task);
+
         return status;
     }
 

@@ -261,10 +261,8 @@ services::Status SVMTrainImpl<thunder, algorithmFPType, ParameterType, cpu>::SMO
                 oldAlphaLocal[i]                           = alpha[wsIndex];
                 alphaLocal[i]                              = alpha[wsIndex];
                 cwLocal[i]                                 = cw[wsIndex];
-
-                kdLocal[i] = kernelWSData[wsIndex];
-                // if (i < 16) printf("%.2lf\n", kdLocal[i]);
-                char Ii = free;
+                kdLocal[i]                                 = kernelWSData[wsIndex];
+                char Ii                                    = free;
                 Ii |= HelperTrainSVM<algorithmFPType, cpu>::isUpper(yLocal[i], alphaLocal[i], cwLocal[i]) ? up : free;
                 Ii |= HelperTrainSVM<algorithmFPType, cpu>::isLower(yLocal[i], alphaLocal[i], cwLocal[i]) ? low : free;
                 I[i] = Ii;
