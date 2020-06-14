@@ -25,6 +25,7 @@
 #define __SERVICE_NUMERIC_TABLE_H__
 
 #include "data_management/data/homogen_numeric_table.h"
+#include "data_management/data/soa_numeric_table.h"
 #include "data_management/data/csr_numeric_table.h"
 #include "data_management/data/symmetric_matrix.h"
 #include "service/kernel/service_defines.h"
@@ -361,6 +362,33 @@ public:
 
 private:
     NumericTableDictionary * _cpuDict;
+};
+
+template <CpuType cpu>
+class SOANumericTableCPU : public SOANumericTable
+{
+public:
+    SOANumericTableCPU(size_t nColumns, size_t nRows, DictionaryIface::FeaturesEqual featuresEqual, services::Status & st)
+        : SOANumericTable(nColumns, nRows, featuresEqual)
+    {}
+    static services::SharedPtr<SOANumericTableCPU<cpu> > create(size_t nColumns = 0, size_t nRows = 0,
+                                                                DictionaryIface::FeaturesEqual featuresEqual = DictionaryIface::notEqual,
+                                                                services::Status * stat                      = NULL)
+    {
+        DAAL_DEFAULT_CREATE_TEMPLATE_IMPL_EX(SOANumericTableCPU, DAAL_TEMPLATE_ARGUMENTS(cpu), nColumns, nRows, featuresEqual);
+    }
+
+    SOANumericTableCPU(NumericTableDictionaryPtr ddict, size_t nRows, AllocationFlag memoryAllocationFlag, services::Status & st)
+        : SOANumericTable(ddict, nRows, memoryAllocationFlag)
+    {}
+
+    static services::SharedPtr<SOANumericTableCPU<cpu> > create(NumericTableDictionaryPtr ddict, size_t nRows,
+                                                                AllocationFlag memoryAllocationFlag = notAllocate, services::Status * stat = NULL)
+    {
+        DAAL_DEFAULT_CREATE_TEMPLATE_IMPL_EX(SOANumericTableCPU, DAAL_TEMPLATE_ARGUMENTS(cpu), ddict, nRows, memoryAllocationFlag);
+    }
+
+    virtual ~SOANumericTableCPU() {}
 };
 
 template <typename algorithmFPType, typename algorithmFPAccessType, CpuType cpu, ReadWriteMode mode, typename NumericTableType>
