@@ -120,7 +120,6 @@ struct TaskWorkingSet
         {
             int64_t pLeft  = 0;
             int64_t pRight = _nVectors - 1;
-            DAAL_ITTNOTIFY_SCOPED_TASK(select.select);
             while (_nSelected < _nWS && (pRight >= 0 || pLeft < _nVectors))
             {
                 if (pLeft < _nVectors)
