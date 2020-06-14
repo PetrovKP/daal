@@ -118,6 +118,7 @@ public:
             int64_t cacheIndex = _lruCache.get(indices[i]);
             if (cacheIndex != -1)
             {
+                // If work index in cache
                 DAAL_ASSERT(cacheIndex < _cacheSize)
                 auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
                 kernelResultTable->template setArray<algorithmFPType>(cachei, i);
@@ -129,7 +130,6 @@ public:
                 DAAL_ASSERT(cacheIndex < _cacheSize)
                 auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
                 kernelResultTable->template setArray<algorithmFPType>(cachei, i);
-                // if (i >= n - 16) printf("%d ", (int)cacheIndex);
                 _kernelIndex[nIndicesForKernel]         = cacheIndex;
                 _kernelOriginalIndex[nIndicesForKernel] = indices[i];
                 ++nIndicesForKernel;
@@ -161,18 +161,16 @@ protected:
 
         services::Status status;
 
-        _kernelComputeTable = SOANumericTable::create(nWorkElements, _lineSize, DictionaryIface::FeaturesEqual::equal, &status);
+        auto kernelComputeTable = SOANumericTable::create(nWorkElements, _lineSize, DictionaryIface::FeaturesEqual::equal, &status);
 
         // printf(">> [computeKernel] _nSelected %lu nWorkElements %lu\n", _nSelected, nWorkElements);
 
         for (size_t i = 0; i < nWorkElements; ++i)
         {
             const size_t kernelInd = _kernelIndex[i];
-            // if (i < 16 || i > nWorkElements - 16) printf("%lu ", kernelInd);
-            auto cachei = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(kernelInd));
-            _kernelComputeTable->template setArray<algorithmFPType>(cachei, i);
+            auto cachei            = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(kernelInd));
+            kernelComputeTable->template setArray<algorithmFPType>(cachei, i);
         }
-        // printf("\n");
 
         const size_t p = _xTable->getNumberOfColumns();
         DAAL_CHECK_STATUS_VAR(status);
@@ -197,24 +195,13 @@ protected:
         _kernel->getInput()->set(kernel_function::X, _xTable);
         _kernel->getInput()->set(kernel_function::Y, _blockTask->getTableData());
 
-        // _kernel->getInput()->set(kernel_function::X, _blockTask->getTableData());
-        // _kernel->getInput()->set(kernel_function::Y, _xTable);
-
         kernel_function::ResultPtr shRes(new kernel_function::Result());
-        shRes->set(kernel_function::values, _kernelComputeTable);
+        shRes->set(kernel_function::values, kernelComputeTable);
         _kernel->setResult(shRes);
-        // printf(">> [reinit - start] _kernel->computeNoThrow(\n");
-
         {
             DAAL_ITTNOTIFY_SCOPED_TASK(cache.getRowsBlock.computeKernel.compute);
             DAAL_CHECK_STATUS(status, _kernel->computeNoThrow());
         }
-        // printf(">> [reinit - finish] _kernel->computeNoThrow(\n");
-
-        // ReadRows<algorithmFPType, cpu> mtData(kernelComputeTable.get(), 0, 2);
-        // const algorithmFPType * res = mtData.get();
-        // for (int i = 0; i < 16; i++) printf("%lf ", res[i]);
-        // printf("\n");
 
         return status;
     }
@@ -222,7 +209,7 @@ protected:
     services::Status init(const size_t nSize)
     {
         services::Status status;
-        printf("cacheSize %lu _lineSize %lu nSize %lu\n", _cacheSize, _lineSize, nSize);
+        // printf("cacheSize %lu _lineSize %lu nSize %lu\n", _cacheSize, _lineSize, nSize);
         _kernelIndex.reset(nSize);
         DAAL_CHECK_MALLOC(_kernelIndex.get());
         _kernelOriginalIndex.reset(nSize);
@@ -243,7 +230,6 @@ protected:
     TArray<uint32_t, cpu> _kernelOriginalIndex;
     TArray<uint32_t, cpu> _kernelIndex;
     services::SharedPtr<SOANumericTable> _cache;
-    services::SharedPtr<SOANumericTable> _kernelComputeTable;
 };
 
 } // namespace internal

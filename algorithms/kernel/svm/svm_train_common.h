@@ -74,7 +74,7 @@ template <CpuType cpu, typename TKey>
 class LRUCache
 {
 public:
-    LRUCache(const size_t capacity) : _capacity(capacity), _hashmap(capacity * 10)
+    LRUCache(const size_t capacity) : _capacity(capacity), _hashmap(capacity * 2)
     {
         _freeIndexCache = -1;
         _count          = 0;
