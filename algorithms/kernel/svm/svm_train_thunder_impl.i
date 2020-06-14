@@ -107,7 +107,7 @@ services::Status SVMTrainImpl<thunder, algorithmFPType, ParameterType, cpu>::com
 
     size_t nNonZeroWeights = nVectors;
     {
-        const size_t blockSize = 2048;
+        const size_t blockSize = 16384;
         const size_t nBlocks   = nVectors / blockSize + !!(nVectors % blockSize);
 
         DAAL_ITTNOTIFY_SCOPED_TASK(init.set);
@@ -313,9 +313,9 @@ services::Status SVMTrainImpl<thunder, algorithmFPType, ParameterType, cpu>::SMO
         const algorithmFPType cwBj = cwLocal[Bj];
 
         /* Update coefficients */
-        const algorithmFPType alphaBiDelta = (yBi > 0.0f) ? cwBi - alphaLocal[Bi] : alphaLocal[Bi];
+        const algorithmFPType alphaBiDelta = (yBi > zero) ? cwBi - alphaLocal[Bi] : alphaLocal[Bi];
         const algorithmFPType alphaBjDelta =
-            services::internal::min<cpu, algorithmFPType>((yBj > 0.0f) ? alphaLocal[Bj] : cwBj - alphaLocal[Bj], delta);
+            services::internal::min<cpu, algorithmFPType>((yBj > zero) ? alphaLocal[Bj] : cwBj - alphaLocal[Bj], delta);
         delta = services::internal::min<cpu, algorithmFPType>(alphaBiDelta, alphaBjDelta);
 
         /* Update alpha */

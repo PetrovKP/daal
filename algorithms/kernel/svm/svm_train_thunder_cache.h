@@ -167,8 +167,8 @@ protected:
 
         for (size_t i = 0; i < nWorkElements; ++i)
         {
-            const size_t kernelInd = _kernelIndex[i];
-            auto cachei            = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(kernelInd));
+            const size_t cacheIndex = _kernelIndex[i];
+            auto cachei             = services::reinterpretPointerCast<algorithmFPType, byte>(_cache->getArraySharedPtr(cacheIndex));
             kernelComputeTable->template setArray<algorithmFPType>(cachei, i);
         }
 
@@ -215,7 +215,7 @@ protected:
         _kernelOriginalIndex.reset(nSize);
         DAAL_CHECK_MALLOC(_kernelOriginalIndex.get());
 
-        auto dict = NumericTableDictionary::create(_cacheSize, DictionaryIface::FeaturesEqual::equal, &status);
+        auto dict = NumericTableDictionaryCPU<cpu>::create(_cacheSize, DictionaryIface::FeaturesEqual::equal, &status);
         DAAL_CHECK_STATUS_VAR(status);
         DAAL_CHECK_STATUS(status, dict->template setAllFeatures<algorithmFPType>());
         _cache = SOANumericTable::create(dict, _lineSize, NumericTable::AllocationFlag::doAllocate, &status);

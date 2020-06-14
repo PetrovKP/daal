@@ -63,13 +63,48 @@ public:
         if (nfeat) setNumberOfFeatures(nfeat);
     };
 
+    NumericTableDictionaryCPU(size_t nfeat, FeaturesEqual featuresEqual, services::Status & st)
+    {
+        _nfeat         = 0;
+        _dict          = (NumericTableFeature *)(new NumericTableFeatureCPU<cpu>[1]);
+        _featuresEqual = featuresEqual;
+        if (nfeat)
+        {
+            st |= setNumberOfFeatures(nfeat);
+        }
+    };
+
+    static services::SharedPtr<NumericTableDictionaryCPU<cpu> > create(size_t nfeat, FeaturesEqual featuresEqual = notEqual,
+                                                                       services::Status * stat = NULL)
+    {
+        DAAL_DEFAULT_CREATE_TEMPLATE_IMPL_EX(NumericTableDictionaryCPU, DAAL_TEMPLATE_ARGUMENTS(cpu), nfeat, featuresEqual);
+    }
+
     services::Status setAllFeatures(const NumericTableFeature & defaultFeature) DAAL_C11_OVERRIDE
     {
-        if (_nfeat > 0)
+        if (_featuresEqual == DictionaryIface::equal)
         {
-            _dict[0] = defaultFeature;
+            if (_nfeat > 0)
+            {
+                _dict[0] = defaultFeature;
+            }
+        }
+        else
+        {
+            for (size_t i = 0; i < _nfeat; i++)
+            {
+                _dict[i] = defaultFeature;
+            }
         }
         return services::Status();
+    }
+
+    template <typename featureType>
+    services::Status setAllFeatures() DAAL_C11_OVERRIDE
+    {
+        NumericTableFeatureCPU<cpu> defaultFeature;
+        defaultFeature.template setType<featureType>();
+        return setAllFeatures(defaultFeature);
     }
 
     services::Status setNumberOfFeatures(size_t nfeat) DAAL_C11_OVERRIDE
@@ -78,6 +113,9 @@ public:
         return services::Status();
     }
 };
+
+// template<CpuType cpu>
+// using Dictionary<NumericTableFeature, SERIALIZATION_DATADICTIONARY_NT_ID> NumericTableDictionary;
 
 template <typename T, CpuType cpu>
 class HomogenNumericTableCPU
