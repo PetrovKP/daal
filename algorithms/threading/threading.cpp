@@ -263,7 +263,7 @@ DAAL_EXPORT void _daal_parallel_sort_f32_u32(f32u32 * array, const size_t n)
 #if defined(__DO_TBB_LAYER__)
     tbb::parallel_sort(array, array + n, [](const f32u32 a, const f32u32 b) { return a.key < b.key; });
 #else
-    daal::algorithms::internal::qSortByKey<f32u32, 0>(n, array);
+    daal::algorithms::internal::qSortByKey<f32u32, daal::sse2>(n, array);
 #endif
 }
 
@@ -272,7 +272,7 @@ DAAL_EXPORT void _daal_parallel_sort_f64_u32(f64u32 * array, const size_t n)
 #if defined(__DO_TBB_LAYER__)
     tbb::parallel_sort(array, array + n, [](const f64u32 a, const f64u32 b) { return a.key < b.key; });
 #else
-    daal::algorithms::internal::qSortByKey<f64u32, 0>(n, array);
+    daal::algorithms::internal::qSortByKey<f64u32, daal::sse2>(n, array);
 #endif
 }
 
