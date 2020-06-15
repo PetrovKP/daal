@@ -40,23 +40,40 @@ namespace internal
 {
 using namespace daal::services::internal;
 
+template <typename algorithmFPType>
+struct IdxValTypeTemplate
+{
+    using type = void;
+};
+template <>
+struct IdxValTypeTemplate<float>
+{
+    using type = f32u32;
+};
+template <>
+struct IdxValTypeTemplate<double>
+{
+    using type = f64u32;
+};
+
 template <typename algorithmFPType, CpuType cpu>
 struct TaskWorkingSet
 {
-    using IndexType = uint32_t;
+    using IndexType  = uint32_t;
+    using IdxValType = typename IdxValTypeTemplate<algorithmFPType>::type;
 
     TaskWorkingSet(const size_t nNonZeroWeights, const size_t nVectors, const size_t maxWS)
         : _nNonZeroWeights(nNonZeroWeights), _nVectors(nVectors), _maxWS(maxWS)
     {}
 
-    struct IdxValType
-    {
-        algorithmFPType key;
-        IndexType val;
+    // struct IdxValType
+    // {
+    //     algorithmFPType key;
+    //     IndexType val;
 
-        bool operator<(const IdxValType & o) const { return key < o.key; }
-        bool operator>(const IdxValType & o) const { return key > o.key; }
-    };
+    //     bool operator<(const IdxValType & o) const { return key < o.key; }
+    //     bool operator>(const IdxValType & o) const { return key > o.key; }
+    // };
 
     services::Status init()
     {
@@ -115,7 +132,9 @@ struct TaskWorkingSet
             }
         });
 
-        algorithms::internal::qSortByKey<IdxValType, cpu>(_nVectors, sortedFIndices);
+        daal::parallel_sort(sortedFIndices, _nVectors);
+        // algorithms::internal::qSortByKey<IdxValType, cpu>(_nVectors, sortedFIndices);
+        // algorithms::internal::qSortByKey<IdxValType, cpu>(_nVectors, sortedFIndices);
 
         {
             int64_t pLeft  = 0;

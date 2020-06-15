@@ -25,6 +25,7 @@
 #define __THREADING_H__
 
 #include "services/daal_defines.h"
+#include "stdint.h"
 
 namespace daal
 {
@@ -72,6 +73,21 @@ extern "C"
 
     DAAL_EXPORT void * _threaded_scalable_malloc(const size_t size, const size_t alignment);
     DAAL_EXPORT void _threaded_scalable_free(void * ptr);
+
+    struct f32u32
+    {
+        float key;
+        uint32_t val;
+    };
+
+    struct f64u32
+    {
+        double key;
+        uint64_t val;
+    };
+
+    DAAL_EXPORT void _daal_parallel_sort_f32_u32(f32u32 * array, const size_t n);
+    DAAL_EXPORT void _daal_parallel_sort_f64_u32(f64u32 * array, const size_t n);
 }
 
 namespace daal
@@ -153,6 +169,25 @@ inline void threader_for_optional(int n, int threads_request, const F & lambda)
     const void * a = static_cast<const void *>(&lambda);
 
     _daal_threader_for_optional(n, threads_request, a, threader_func<F>);
+}
+
+template <typename T>
+inline void parallel_sort(T * array, const size_t n)
+{
+    f32u32 * array_cast = static_cast<f32u32 *>(array);
+    _daal_parallel_sort_f32_u32(array_cast, n);
+}
+
+template <>
+inline void parallel_sort<f32u32>(f32u32 * array, const size_t n)
+{
+    _daal_parallel_sort_f32_u32(array, n);
+}
+
+template <>
+inline void parallel_sort<f64u32>(f64u32 * array, const size_t n)
+{
+    _daal_parallel_sort_f64_u32(array, n);
 }
 
 template <typename lambdaType>
