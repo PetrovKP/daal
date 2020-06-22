@@ -48,13 +48,13 @@ struct KernelRBFTask
 {
 public:
     DAAL_NEW_DELETE();
-    algorithmFPType * mklBuff;
     algorithmFPType * sqrDataA1;
     algorithmFPType * sqrDataA2;
+    algorithmFPType * mklBuff;
 
-    static KernelRBFTask * create(const size_t blockSize, const bool isEqualMatrix)
+    static KernelRBFTask * create(const size_t blockSize1, const size_t blockSize2, const bool isEqualMatrix)
     {
-        auto object = new KernelRBFTask(blockSize, isEqualMatrix);
+        auto object = new KernelRBFTask(blockSize1, blockSize2, isEqualMatrix);
         if (object && object->isValid()) return object;
         delete object;
         return nullptr;
@@ -63,14 +63,14 @@ public:
     bool isValid() const { return _buff.get(); }
 
 private:
-    KernelRBFTask(const size_t blockSize, const bool isEqualMatrix)
+    KernelRBFTask(const size_t blockSize1, const size_t blockSize2, const bool isEqualMatrix)
     {
-        const size_t buffASize = isEqualMatrix ? blockSize : 2 * blockSize;
-        _buff.reset(blockSize * blockSize + 2 * blockSize);
+        const size_t buffASize = isEqualMatrix ? blockSize1 : 2 * blockSize1;
+        _buff.reset(blockSize1 * blockSize2 + 2 * buffASize);
 
         mklBuff   = &_buff[0];
-        sqrDataA1 = &_buff[blockSize * blockSize];
-        sqrDataA2 = isEqualMatrix ? sqrDataA1 : &sqrDataA1[blockSize];
+        sqrDataA1 = &_buff[blockSize1 * blockSize2];
+        sqrDataA2 = isEqualMatrix ? sqrDataA1 : &sqrDataA1[blockSize1];
     }
 
     TArrayScalable<algorithmFPType, cpu> _buff;
@@ -177,13 +177,14 @@ services::Status KernelImplRBF<defaultDense, algorithmFPType, cpu>::computeInter
     DAAL_OVERFLOW_CHECK_BY_ADDING(size_t, nVectors1, nVectors2);
     DAAL_OVERFLOW_CHECK_BY_MULTIPLICATION(size_t, nVectors1 + nVectors2, sizeof(algorithmFPType));
 
-    const size_t blockSize                = 256;
-    const size_t nBlocks1                 = nVectors1 / blockSize + !!(nVectors1 % blockSize);
-    const size_t nBlocks2                 = nVectors2 / blockSize + !!(nVectors2 % blockSize);
+    const size_t blockSize1               = 256;
+    const size_t blockSize2               = 256;
+    const size_t nBlocks1                 = nVectors1 / blockSize1 + !!(nVectors1 % blockSize1);
+    const size_t nBlocks2                 = nVectors2 / blockSize2 + !!(nVectors2 % blockSize2);
     const algorithmFPType expExpThreshold = Math<algorithmFPType, cpu>::vExpThreshold();
 
     daal::tls<KernelRBFTask<algorithmFPType, cpu> *> tslTask([=, &safeStat]() {
-        auto tlsData = KernelRBFTask<algorithmFPType, cpu>::create(blockSize, isEqualMatrix);
+        auto tlsData = KernelRBFTask<algorithmFPType, cpu>::create(blockSize1, blockSize2, isEqualMatrix);
         if (!tlsData)
         {
             safeStat.add(services::ErrorMemoryAllocationFailed);
@@ -192,20 +193,16 @@ services::Status KernelImplRBF<defaultDense, algorithmFPType, cpu>::computeInter
     });
 
     daal::threader_for(nBlocks1, nBlocks1, [&](const size_t iBlock1) {
-        DAAL_INT nRowsInBlock1 = (iBlock1 != nBlocks1 - 1) ? blockSize : nVectors1 - iBlock1 * blockSize;
-        DAAL_INT startRow1     = iBlock1 * blockSize;
+        DAAL_INT nRowsInBlock1 = (iBlock1 != nBlocks1 - 1) ? blockSize1 : nVectors1 - iBlock1 * blockSize1;
+        DAAL_INT startRow1     = iBlock1 * blockSize1;
 
         ReadRows<algorithmFPType, cpu> mtA1(*const_cast<NumericTable *>(a1), startRow1, nRowsInBlock1);
         DAAL_CHECK_BLOCK_STATUS_THR(mtA1);
         const algorithmFPType * const dataA1 = const_cast<algorithmFPType *>(mtA1.get());
 
-        WriteOnlyRows<algorithmFPType, cpu> mtR(r, startRow1, nRowsInBlock1);
-        DAAL_CHECK_BLOCK_STATUS_THR(mtR);
-        algorithmFPType * dataR = mtR.get();
-
         daal::threader_for(nBlocks2, nBlocks2, [&, nVectors2, nBlocks2](const size_t iBlock2) {
-            DAAL_INT nRowsInBlock2 = (iBlock2 != nBlocks2 - 1) ? blockSize : nVectors2 - iBlock2 * blockSize;
-            DAAL_INT startRow2     = iBlock2 * blockSize;
+            DAAL_INT nRowsInBlock2 = (iBlock2 != nBlocks2 - 1) ? blockSize2 : nVectors2 - iBlock2 * blockSize2;
+            DAAL_INT startRow2     = iBlock2 * blockSize2;
 
             KernelRBFTask<algorithmFPType, cpu> * const tlsLocal = tslTask.local();
 
@@ -234,22 +231,34 @@ services::Status KernelImplRBF<defaultDense, algorithmFPType, cpu>::computeInter
 
             DAAL_INT lda = nFeatures;
             DAAL_INT ldb = nFeatures;
-            DAAL_INT ldc = blockSize;
-            Blas<algorithmFPType, cpu>::xxgemm(&trans, &notrans, &nRowsInBlock2, &nRowsInBlock1, (DAAL_INT *)&nFeatures, &negTwo, dataA2, &ldb,
-                                               dataA1, &lda, &zero, mklBuff, &ldc);
-            for (size_t i = 0; i < nRowsInBlock1; ++i)
-            {
-                const algorithmFPType sqrA1i         = sqrDataA1[i];
-                algorithmFPType * const mklBuffBlock = &mklBuff[i * blockSize];
+            DAAL_INT ldc = blockSize2;
+            // Blas<algorithmFPType, cpu>::xxgemm(&trans, &notrans, &nRowsInBlock2, &nRowsInBlock1, (DAAL_INT *)&nFeatures, &negTwo, dataA2, &ldb,
+            //                                    dataA1, &lda, &zero, mklBuff, &ldc);
 
-                for (size_t j = 0; j < nRowsInBlock2; ++j)
+            Blas<algorithmFPType, cpu>::xxgemm(&trans, &notrans, &nRowsInBlock1, &nRowsInBlock2, (DAAL_INT *)&nFeatures, &negTwo, dataA1, &lda,
+                                               dataA2, &ldb, &zero, mklBuff, &ldc);
+
+            for (size_t j = 0; j < nRowsInBlock2; ++j)
+            {
+                const algorithmFPType sqrA2i = sqrDataA2[j];
+                WriteOnlyColumns<algorithmFPType, cpu> mtR(r, startRow2 + j, startRow1, nRowsInBlock1);
+
+                DAAL_CHECK_BLOCK_STATUS_THR(mtR);
+
+                algorithmFPType * mklBuffBlock = &mklBuff[j * blockSize2];
+                algorithmFPType * dataR        = mtR.get();
+                PRAGMA_IVDEP
+                PRAGMA_VECTOR_ALWAYS
+                for (size_t i = 0; i < nRowsInBlock1; ++i)
                 {
-                    algorithmFPType rbf = (mklBuffBlock[j] + sqrA1i + sqrDataA2[j]) * coeff;
-                    rbf                 = rbf > expExpThreshold ? rbf : expExpThreshold;
-                    mklBuffBlock[j]     = rbf;
+                    algorithmFPType rbf = (mklBuffBlock[i] + sqrA2i + sqrDataA1[i]) * coeff;
+                    dataR[i]            = rbf > expExpThreshold ? rbf : expExpThreshold;
                 }
-                algorithmFPType * const dataRBlock = &dataR[i * nVectors2 + startRow2];
-                Math<algorithmFPType, cpu>::vExp(nRowsInBlock2, mklBuffBlock, dataRBlock);
+                // algorithmFPType * const dataRBlock = &dataR[i * nVectors2 + startRow2];
+                // Math<algorithmFPType, cpu>::vExp(nRowsInBlock2, mklBuffBlock, dataRBlock);
+                DAAL_PREFETCH_READ_T0(&mklBuff[(j + 1) * blockSize2]);
+
+                Math<algorithmFPType, cpu>::vExp(nRowsInBlock1, dataR, dataR);
             }
         });
     });

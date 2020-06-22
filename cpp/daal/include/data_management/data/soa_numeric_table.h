@@ -528,25 +528,40 @@ protected:
 
             T * blockPtr = block.getBlockPtr();
 
-            for (size_t i = 0; i < nrows; i += di)
+            bool computed = false;
+
+            if (_wrapOffsets.get())
             {
-                if (i + di > nrows)
+                NumericTableFeature & f = (*_ddict)[0];
+
+                if (daal::data_management::features::getIndexNumType<T>() == f.indexType)
                 {
-                    di = nrows - i;
+                    T * ptrMin = (T *)(_arrays[_index].get()) + idx;
+                    computed   = data_management::internal::getVector2<T>()(nrows, ncols, blockPtr, ptrMin, _wrapOffsets.get());
                 }
-
-                for (size_t j = 0; j < ncols; j++)
+            }
+            if (!computed)
+            {
+                for (size_t i = 0; i < nrows; i += di)
                 {
-                    NumericTableFeature & f = (*_ddict)[j];
-
-                    char * ptr = (char *)_arrays[j].get() + (idx + i) * f.typeSize;
-
-                    for (size_t ii = 0; ii < di; ii++)
+                    if (i + di > nrows)
                     {
-                        lbuf[ii] = blockPtr[(i + ii) * ncols + j];
+                        di = nrows - i;
                     }
 
-                    internal::getVectorDownCast(f.indexType, internal::getConversionDataType<T>())(di, lbuf, ptr);
+                    for (size_t j = 0; j < ncols; j++)
+                    {
+                        NumericTableFeature & f = (*_ddict)[j];
+
+                        char * ptr = (char *)_arrays[j].get() + (idx + i) * f.typeSize;
+
+                        for (size_t ii = 0; ii < di; ii++)
+                        {
+                            lbuf[ii] = blockPtr[(i + ii) * ncols + j];
+                        }
+
+                        internal::getVectorDownCast(f.indexType, internal::getConversionDataType<T>())(di, lbuf, ptr);
+                    }
                 }
             }
         }
