@@ -34,12 +34,6 @@ void vectorCopy(const size_t nrows, const size_t ncols, void * dst, void const *
 template <typename T>
 void vectorCopyInternal(const size_t nrows, const size_t ncols, void * dst, void const * ptrMin, DAAL_INT64 const * arrOffsets);
 
-template <typename T, CpuType cpu>
-void vectorCopy2(const size_t nrows, const size_t ncols, void * dst, void * ptrMin, DAAL_INT64 const * arrOffsets);
-
-template <typename T>
-void vectorCopyInternal2(const size_t nrows, const size_t ncols, void * dst, void * ptrMin, DAAL_INT64 const * arrOffsets);
-
 #endif
 
 template <typename T1, typename T2, CpuType cpu>

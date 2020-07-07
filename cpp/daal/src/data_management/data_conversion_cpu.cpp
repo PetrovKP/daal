@@ -33,12 +33,6 @@ void vectorCopyInternal()
     vectorCopyInternal<T>();
 }
 
-template <typename T>
-void vectorCopyInternal2()
-{
-    vectorCopyInternal2<T>();
-}
-
 template <>
 void vectorCopyInternal<float>(const size_t nrows, const size_t ncols, void * dst, void const * ptrMin, DAAL_INT64 const * arrOffsets)
 {
@@ -70,59 +64,21 @@ void vectorCopyInternal<double>(const size_t nrows, const size_t ncols, void * d
     double const * pmin  = static_cast<double const *>(ptrMin);
     char const * ptrByte = static_cast<char const *>(ptrMin);
 
-    // const size_t nColSize = ncols - ncols % 8;
-    const size_t nColSize = 0;
-
-    for (size_t i = 0; i < nrows; ++i)
-    {
-        // for (size_t j = 0; j < nColSize; j += 8)
-        // {
-        //     __m512d p = _mm512_i64gather_pd(*((__m512i *)&arrOffsets[j]), pmin + i, 1);
-        //     _mm512_storeu_pd(pd + i * ncols + j, p);
-        // }
-        for (size_t j = nColSize; j < ncols; ++j)
-        {
-            char const * pc   = ptrByte + arrOffsets[j];
-            pd[i * ncols + j] = *((double *)(pc) + i);
-        }
-    }
-}
-
-template <>
-void vectorCopyInternal2<double>(const size_t nrows, const size_t ncols, void * dst, void * ptrMin, DAAL_INT64 const * arrOffsets)
-{
-    double * pd          = static_cast<double *>(dst);
-    double const * pmin  = static_cast<double const *>(ptrMin);
-    char const * ptrByte = static_cast<char const *>(ptrMin);
-
     const size_t nColSize = ncols - ncols % 8;
 
     for (size_t i = 0; i < nrows; ++i)
     {
         for (size_t j = 0; j < nColSize; j += 8)
         {
-            __m512d p = _mm512_load_pd(pd + i * ncols + j);
-            _mm512_i64scatter_pd((void *)(pmin + i), *((__m512i *)&arrOffsets[j]), p, 1);
+            __m512d p = _mm512_i64gather_pd(*((__m512i *)&arrOffsets[j]), pmin + i, 1);
+            _mm512_storeu_pd(pd + i * ncols + j, p);
         }
         for (size_t j = nColSize; j < ncols; ++j)
         {
-            char const * pc       = ptrByte + arrOffsets[j];
-            *((double *)(pc) + i) = pd[i * ncols + j];
+            char const * pc   = ptrByte + arrOffsets[j];
+            pd[i * ncols + j] = *((double *)(pc) + i);
         }
     }
-}
-
-template <typename T, CpuType cpu>
-void vectorCopy2(const size_t nrows, const size_t ncols, void * dst, void * ptrMin, DAAL_INT64 const * arrOffsets)
-{
-    vectorCopy2<T, cpu>(nrows, ncols, dst, ptrMin, arrOffsets);
-}
-
-/* Convert float to float from columnar to row major format using AVX512 architecture */
-template <>
-void vectorCopy2<double, avx512>(const size_t nrows, const size_t ncols, void * dst, void * ptrMin, DAAL_INT64 const * arrOffsets)
-{
-    vectorCopyInternal2<double>(nrows, ncols, dst, ptrMin, arrOffsets);
 }
 
 template <typename T, CpuType cpu>

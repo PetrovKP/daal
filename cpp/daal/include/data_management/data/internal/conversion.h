@@ -83,11 +83,6 @@ DAAL_EXPORT vectorCopy2vFuncType getVector<float>();
 template <>
 DAAL_EXPORT vectorCopy2vFuncType getVector<double>();
 
-template <typename T>
-DAAL_EXPORT vectorCopy2vFuncType_v2 getVector2();
-template <>
-DAAL_EXPORT vectorCopy2vFuncType_v2 getVector2<double>();
-
 DAAL_EXPORT vectorConvertFuncType getVectorUpCast(int, int);
 DAAL_EXPORT vectorConvertFuncType getVectorDownCast(int, int);
 

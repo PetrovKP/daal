@@ -60,41 +60,9 @@ static bool tryToCopyFuncAVX512(const size_t nrows, const size_t ncols, void * d
     return true;
 }
 
-template <typename T>
-static bool tryToCopyFuncAVX512_2(const size_t nrows, const size_t ncols, void * dst, void * ptrMin, DAAL_INT64 const * arrOffsets)
-{
-    typedef void (*funcType)(const size_t nrows, const size_t ncols, void * dst, void * ptrMin, DAAL_INT64 const * arrOffsets);
-    static funcType ptr = NULL;
-
-    if (!ptr)
-    {
-        int cpuid = (int)daal::services::Environment::getInstance()->getCpuId();
-
-        switch (cpuid)
-        {
-    #ifdef DAAL_KERNEL_AVX512
-        case avx512: DAAL_KERNEL_AVX512_ONLY_CODE(ptr = vectorCopy2<T, avx512>); break;
-    #endif
-    #ifdef DAAL_KERNEL_AVX512_MIC
-        case avx512_mic: DAAL_KERNEL_AVX512_MIC_ONLY_CODE(ptr = vectorCopy2<T, avx512_mic>); break;
-    #endif
-        default: return false;
-        }
-    }
-
-    ptr(nrows, ncols, dst, ptrMin, arrOffsets);
-    return true;
-}
-
 #else
 template <typename T>
 static bool tryToCopyFuncAVX512(const size_t nrows, const size_t ncols, void * dst, void const * ptrMin, DAAL_INT64 const * arrOffsets)
-{
-    return false;
-}
-
-template <typename T>
-static bool tryToCopyFuncAVX512_2(const size_t nrows, const size_t ncols, void * dst, void * ptrMin, DAAL_INT64 const * arrOffsets)
 {
     return false;
 }
@@ -183,30 +151,6 @@ DAAL_EXPORT vectorCopy2vFuncType getVector<double>()
 
 template <>
 DAAL_EXPORT vectorCopy2vFuncType getVector<int>()
-{
-    return NULL; /* no implementation for integer */
-}
-
-template <typename T>
-DAAL_EXPORT vectorCopy2vFuncType getVector2()
-{
-    return tryToCopyFuncAVX512<T>;
-}
-
-template <>
-DAAL_EXPORT vectorCopy2vFuncType_v2 getVector2<double>()
-{
-    return tryToCopyFuncAVX512_2<double>;
-}
-
-template <>
-DAAL_EXPORT vectorCopy2vFuncType_v2 getVector2<float>()
-{
-    return NULL; /* no implementation for integer */
-}
-
-template <>
-DAAL_EXPORT vectorCopy2vFuncType_v2 getVector2<int>()
 {
     return NULL; /* no implementation for integer */
 }
