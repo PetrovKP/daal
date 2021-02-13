@@ -43,8 +43,7 @@ namespace interface1
 template <typename algorithmFPType, prediction::Method pmethod, training::Method tmethod, CpuType cpu>
 BatchContainer<algorithmFPType, pmethod, tmethod, cpu>::BatchContainer(daal::services::Environment::env * daalEnv)
 {
-    __DAAL_INITIALIZE_KERNELS(internal::MultiClassClassifierPredictKernel, pmethod, tmethod, algorithmFPType,
-                              classifier::prediction::interface1::Batch, multi_class_classifier::interface1::Parameter);
+    __DAAL_INITIALIZE_KERNELS(internal::MultiClassClassifierPredictKernel, pmethod, tmethod, algorithmFPType);
 }
 
 template <typename algorithmFPType, prediction::Method pmethod, training::Method tmethod, CpuType cpu>
@@ -64,12 +63,18 @@ services::Status BatchContainer<algorithmFPType, pmethod, tmethod, cpu>::compute
     NumericTable * r[1];
     r[0] = static_cast<NumericTable *>(result->get(classifier::prediction::prediction).get());
 
-    const daal::algorithms::Parameter * par = _par;
-    daal::services::Environment::env & env  = *_env;
-    __DAAL_CALL_KERNEL(env, internal::MultiClassClassifierPredictKernel,
-                       __DAAL_KERNEL_ARGUMENTS(pmethod, tmethod, algorithmFPType, classifier::prediction::interface1::Batch,
-                                               multi_class_classifier::interface1::Parameter),
-                       compute, a, m, r[0], nullptr, par);
+    multi_class_classifier::interface1::Parameter * par = static_cast<multi_class_classifier::interface1::Parameter *>(_par);
+    multi_class_classifier::interface2::Parameter par2(par->nClasses);
+
+    par2.training          = par->training;
+    par2.prediction        = par->prediction;
+    par2.accuracyThreshold = par->accuracyThreshold;
+    par2.maxIterations     = par->maxIterations;
+
+    daal::services::Environment::env & env = *_env;
+
+    __DAAL_CALL_KERNEL(env, internal::MultiClassClassifierPredictKernel, __DAAL_KERNEL_ARGUMENTS(pmethod, tmethod, algorithmFPType), compute, a, m,
+                       r[0], nullptr, &par2);
 }
 
 } // namespace interface1

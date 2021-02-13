@@ -42,8 +42,7 @@ namespace interface2
 template <typename algorithmFPType, Method method, CpuType cpu>
 BatchContainer<algorithmFPType, method, cpu>::BatchContainer(daal::services::Environment::env * daalEnv)
 {
-    __DAAL_INITIALIZE_KERNELS(internal::MultiClassClassifierTrainKernel, method, algorithmFPType, classifier::training::Batch,
-                              multi_class_classifier::Parameter);
+    __DAAL_INITIALIZE_KERNELS(internal::MultiClassClassifierTrainKernel, method, algorithmFPType);
 }
 
 template <typename algorithmFPType, Method method, CpuType cpu>
@@ -67,9 +66,8 @@ services::Status BatchContainer<algorithmFPType, method, cpu>::compute()
 
     const multi_class_classifier::Parameter * par = static_cast<const multi_class_classifier::Parameter *>(_par);
     daal::services::Environment::env & env        = *_env;
-    __DAAL_CALL_KERNEL(env, internal::MultiClassClassifierTrainKernel,
-                       __DAAL_KERNEL_ARGUMENTS(method, algorithmFPType, classifier::training::Batch, multi_class_classifier::Parameter), compute,
-                       a[0], a[1], a[2], r, par);
+    __DAAL_CALL_KERNEL(env, internal::MultiClassClassifierTrainKernel, __DAAL_KERNEL_ARGUMENTS(method, algorithmFPType), compute, a[0], a[1], a[2], r,
+                       par);
 }
 
 } // namespace interface2

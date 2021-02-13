@@ -137,10 +137,10 @@ Factory::Factory() : _impl(nullptr)
     for (auto ptr = SerializationDesc::first(); ptr; ptr = ptr->next()) _impl->add(new DefaultCreator(ptr), true);
 
     __DAAL_REGISTER_TEMPLATED_OBJECT(Creator, HomogenNumericTable, );
-    __DAAL_REGISTER_TEMPLATED_OBJECT(Creator, Matrix, );
 
     __DAAL_REGISTER_TEMPLATED_OBJECT(Creator, internal::SyclHomogenNumericTable, );
 
+    __DAAL_REGISTER_TEMPLATED_OBJECT(Creator, Matrix, );
     __DAAL_REGISTER_TEMPLATED_OBJECT(Creator, PackedSymmetricMatrix, NumericTableIface::upperPackedSymmetricMatrix, );
     __DAAL_REGISTER_TEMPLATED_OBJECT(Creator, PackedSymmetricMatrix, NumericTableIface::lowerPackedSymmetricMatrix, );
     __DAAL_REGISTER_TEMPLATED_OBJECT(Creator, PackedTriangularMatrix, NumericTableIface::upperPackedTriangularMatrix, );

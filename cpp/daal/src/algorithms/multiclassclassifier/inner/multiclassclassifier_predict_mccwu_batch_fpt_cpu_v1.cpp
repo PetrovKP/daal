@@ -23,9 +23,6 @@
 */
 
 #include "src/algorithms/multiclassclassifier/inner/multiclassclassifier_predict_batch_container_v1.h"
-#include "src/algorithms/multiclassclassifier/multiclassclassifier_predict_kernel.h"
-#include "src/algorithms/multiclassclassifier/multiclassclassifier_predict_mccwu_kernel.h"
-#include "src/algorithms/multiclassclassifier/multiclassclassifier_predict_mccwu_impl.i"
 
 namespace daal
 {
@@ -39,11 +36,6 @@ namespace interface1
 {
 template class BatchContainer<DAAL_FPTYPE, multiClassClassifierWu, training::oneAgainstOne, DAAL_CPU>;
 }
-namespace internal
-{
-template class MultiClassClassifierPredictKernel<multiClassClassifierWu, training::oneAgainstOne, DAAL_FPTYPE,
-                                                 classifier::prediction::interface1::Batch, multi_class_classifier::interface1::Parameter, DAAL_CPU>;
-} // namespace internal
 } // namespace prediction
 } // namespace multi_class_classifier
 } // namespace algorithms

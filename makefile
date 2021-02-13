@@ -1173,6 +1173,7 @@ Flags:
   REQCPU - list of CPU optimizations to be included into library
       possible values: $(CPUs)
   REQDBG - Flag that enables build in debug mode
+  HOSTONLY - Flag that enables only host part
 endef
 
 daal_dbg:

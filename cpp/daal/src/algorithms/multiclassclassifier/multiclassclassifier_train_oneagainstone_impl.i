@@ -47,13 +47,15 @@ namespace training
 {
 namespace internal
 {
-template <typename algorithmFPType, typename ClsType, typename MccParType, CpuType cpu>
-services::Status MultiClassClassifierTrainKernel<oneAgainstOne, algorithmFPType, ClsType, MccParType, cpu>::compute(
-    const NumericTable * xTable, const NumericTable * yTable, const NumericTable * wTable, daal::algorithms::Model * r,
-    const daal::algorithms::Parameter * par)
+template <typename algorithmFPType, CpuType cpu>
+services::Status MultiClassClassifierTrainKernel<oneAgainstOne, algorithmFPType, cpu>::compute(const NumericTable * xTable,
+                                                                                               const NumericTable * yTable,
+                                                                                               const NumericTable * wTable,
+                                                                                               daal::algorithms::Model * r,
+                                                                                               const daal::algorithms::Parameter * par)
 {
-    Model * model             = static_cast<Model *>(r);
-    const MccParType * mccPar = static_cast<const MccParType *>(par);
+    Model * model                                    = static_cast<Model *>(r);
+    const multi_class_classifier::Parameter * mccPar = static_cast<const multi_class_classifier::Parameter *>(par);
 
     const size_t nVectors = xTable->getNumberOfRows();
     ReadColumns<algorithmFPType, cpu> mtY(*const_cast<NumericTable *>(yTable), 0, 0, nVectors);
@@ -66,7 +68,7 @@ services::Status MultiClassClassifierTrainKernel<oneAgainstOne, algorithmFPType,
 
     const size_t nFeatures = xTable->getNumberOfColumns();
     model->setNFeatures(nFeatures);
-    services::SharedPtr<ClsType> simpleTrainingInit = mccPar->training->clone();
+    services::SharedPtr<classifier::training::Batch> simpleTrainingInit = mccPar->training->clone();
 
     const size_t nClasses = mccPar->nClasses;
     /* Compute data size needed to store the largest subset of input tables */
@@ -76,14 +78,12 @@ services::Status MultiClassClassifierTrainKernel<oneAgainstOne, algorithmFPType,
         DAAL_CHECK_STATUS(s, computeDataSize(nVectors, nFeatures, nClasses, xTable, y, nSubsetVectors, dataSize));
     }
 
-    typedef SubTask<algorithmFPType, ClsType, cpu> TSubTask;
+    typedef SubTask<algorithmFPType, cpu> TSubTask;
     /* Allocate memory for storing subsets of input data */
     daal::ls<TSubTask *> lsTask([=, &simpleTrainingInit]() {
         if (xTable->getDataLayout() == NumericTableIface::csrArray)
-            return (TSubTask *)SubTaskCSR<algorithmFPType, ClsType, cpu>::create(nFeatures, nSubsetVectors, dataSize, xTable, weights,
-                                                                                 simpleTrainingInit);
-        return (TSubTask *)SubTaskDense<algorithmFPType, ClsType, cpu>::create(nFeatures, nSubsetVectors, dataSize, xTable, weights,
-                                                                               simpleTrainingInit);
+            return (TSubTask *)SubTaskCSR<algorithmFPType, cpu>::create(nFeatures, nSubsetVectors, dataSize, xTable, weights, simpleTrainingInit);
+        return (TSubTask *)SubTaskDense<algorithmFPType, cpu>::create(nFeatures, nSubsetVectors, dataSize, xTable, weights, simpleTrainingInit);
     });
 
     SafeStatus safeStat;
@@ -131,10 +131,10 @@ services::Status MultiClassClassifierTrainKernel<oneAgainstOne, algorithmFPType,
     return safeStat.detach();
 }
 
-template <typename algorithmFPType, typename ClsType, typename MccParType, CpuType cpu>
-Status MultiClassClassifierTrainKernel<oneAgainstOne, algorithmFPType, ClsType, MccParType, cpu>::computeDataSize(
-    size_t nVectors, size_t nFeatures, size_t nClasses, const NumericTable * xTable, const algorithmFPType * y, size_t & nSubsetVectors,
-    size_t & dataSize)
+template <typename algorithmFPType, CpuType cpu>
+Status MultiClassClassifierTrainKernel<oneAgainstOne, algorithmFPType, cpu>::computeDataSize(size_t nVectors, size_t nFeatures, size_t nClasses,
+                                                                                             const NumericTable * xTable, const algorithmFPType * y,
+                                                                                             size_t & nSubsetVectors, size_t & dataSize)
 {
     TArray<size_t, cpu> buffer(4 * nClasses);
     DAAL_CHECK_MALLOC(buffer.get());
@@ -181,9 +181,9 @@ Status MultiClassClassifierTrainKernel<oneAgainstOne, algorithmFPType, ClsType, 
     return Status();
 }
 
-template <typename algorithmFPType, typename ClsType, CpuType cpu>
-Status SubTaskDense<algorithmFPType, ClsType, cpu>::copyDataIntoSubtable(size_t nFeatures, size_t nVectors, int classIdx, algorithmFPType label,
-                                                                         const algorithmFPType * y, size_t & nRows)
+template <typename algorithmFPType, CpuType cpu>
+Status SubTaskDense<algorithmFPType, cpu>::copyDataIntoSubtable(size_t nFeatures, size_t nVectors, int classIdx, algorithmFPType label,
+                                                                const algorithmFPType * y, size_t & nRows)
 {
     for (size_t ix = 0; ix < nVectors; ix++)
     {
@@ -203,9 +203,9 @@ Status SubTaskDense<algorithmFPType, ClsType, cpu>::copyDataIntoSubtable(size_t 
     return Status();
 }
 
-template <typename algorithmFPType, typename ClsType, CpuType cpu>
-Status SubTaskCSR<algorithmFPType, ClsType, cpu>::copyDataIntoSubtable(size_t nFeatures, size_t nVectors, int classIdx, algorithmFPType label,
-                                                                       const algorithmFPType * y, size_t & nRows)
+template <typename algorithmFPType, CpuType cpu>
+Status SubTaskCSR<algorithmFPType, cpu>::copyDataIntoSubtable(size_t nFeatures, size_t nVectors, int classIdx, algorithmFPType label,
+                                                              const algorithmFPType * y, size_t & nRows)
 {
     _rowOffsetsX[0]  = 1;
     size_t dataIndex = (nRows ? _rowOffsetsX[nRows] - _rowOffsetsX[0] : 0);

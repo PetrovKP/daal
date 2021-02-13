@@ -1,4 +1,4 @@
-/* file: multiclassclassifier_predict_votebased_batch_fpt_cpu_v1.cpp */
+/* file: multiclassclassifier_train_oneagainstone_batch_fpt_dispatcher_v1.cpp */
 /*******************************************************************************
 * Copyright 2014-2021 Intel Corporation
 *
@@ -17,27 +17,19 @@
 
 /*
 //++
-//  Implementation of Wu method for Multi-class classifier
-//  prediction algorithm.
+//  Instantiation of Multi-class classifier training algorithm container.
 //--
 */
 
-#include "src/algorithms/multiclassclassifier/inner/multiclassclassifier_predict_batch_container_v1.h"
+#include "algorithms/multi_class_classifier/multi_class_classifier_train.h"
+#include "src/algorithms/multiclassclassifier/inner/multiclassclassifier_train_batch_container_v1.h"
 
 namespace daal
 {
 namespace algorithms
 {
-namespace multi_class_classifier
-{
-namespace prediction
-{
-namespace interface1
-{
-template class BatchContainer<DAAL_FPTYPE, voteBased, training::oneAgainstOne, DAAL_CPU>;
-}
+__DAAL_INSTANTIATE_DISPATCH_CONTAINER(multi_class_classifier::training::interface1::BatchContainer, batch, DAAL_FPTYPE,
+                                      multi_class_classifier::training::oneAgainstOne)
 
-} // namespace prediction
-} // namespace multi_class_classifier
 } // namespace algorithms
 } // namespace daal
