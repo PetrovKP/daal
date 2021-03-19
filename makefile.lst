@@ -230,14 +230,16 @@ ONEAPI.ALGOS.kmeans_init := CORE.kmeans
 ONEAPI.ALGOS.knn := CORE.k_nearest_neighbors
 ONEAPI.ALGOS.linear_kernel := CORE.kernel_function
 ONEAPI.ALGOS.pca           := CORE.pca
+ONEAPI.ALGOS.polynomial_kernel := CORE.kernel_function
 ONEAPI.ALGOS.rbf_kernel    := CORE.kernel_function
 ONEAPI.ALGOS.svm           := CORE.svm
 
 # List of algorithms in oneAPI part
-ONEAPI.ALGOS :=     \
-    linear_kernel   \
-    rbf_kernel      \
-    svm             \
+ONEAPI.ALGOS :=       \
+    linear_kernel     \
+    rbf_kernel        \
+    polynomial_kernel \
+    svm               \
 
 
 ONEAPI.IO :=     \
