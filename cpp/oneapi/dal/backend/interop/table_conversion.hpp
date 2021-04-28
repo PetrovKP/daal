@@ -199,12 +199,15 @@ inline daal::data_management::CSRNumericTablePtr copy_to_daal_csr_table(
 
 template <typename T>
 inline detail::csr_table convert_from_daal_csr_table(
-    const daal::data_management::CSRNumericTablePtr& nt) {
+    const daal::data_management::NumericTablePtr& nt) {
+    daal::data_management::CSRNumericTable* csr_nt =
+        dynamic_cast<daal::data_management::CSRNumericTable*>(nt.get());
+    ONEDAL_ASSERT(csr_nt);
     daal::data_management::CSRBlockDescriptor<T> block;
-    const std::int64_t row_count = nt->getNumberOfRows();
-    const std::int64_t column_count = nt->getNumberOfColumns();
+    const std::int64_t row_count = csr_nt->getNumberOfRows();
+    const std::int64_t column_count = csr_nt->getNumberOfColumns();
 
-    nt->getSparseBlock(0, row_count, daal::data_management::readOnly, block);
+    csr_nt->getSparseBlock(0, row_count, daal::data_management::readOnly, block);
     T* daal_data = block.getBlockValuesPtr();
     std::size_t* daal_column_indices = block.getBlockColumnIndicesPtr();
     std::size_t* daal_row_indices = block.getBlockRowIndicesPtr();
@@ -214,10 +217,10 @@ inline detail::csr_table convert_from_daal_csr_table(
                              reinterpret_cast<std::int64_t*>(daal_row_indices),
                              row_count,
                              column_count,
-                             [nt, block](const T* p) {},
-                             [nt, block](const std::int64_t* p) {},
-                             [nt, block](const std::int64_t* p) {} };
-    nt->releaseSparseBlock(block);
+                             [csr_nt, block](const T* p) {},
+                             [csr_nt, block](const std::int64_t* p) {},
+                             [csr_nt, block](const std::int64_t* p) {} };
+    csr_nt->releaseSparseBlock(block);
     return table;
 }
 

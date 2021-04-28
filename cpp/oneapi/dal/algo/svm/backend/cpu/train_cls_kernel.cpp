@@ -76,7 +76,8 @@ static result_t call_multiclass_daal_kernel(const context_cpu& ctx,
     if (!kernel_impl) {
         throw internal_error{ dal::detail::error_messages::unknown_kernel_function_type() };
     }
-    const auto daal_kernel = kernel_impl->get_daal_kernel_function();
+    const bool is_dense{ data.get_kind() == homogen_table::kind() };
+    const auto daal_kernel = kernel_impl->get_daal_kernel_function(is_dense);
 
     daal_svm::Parameter daal_svm_parameter(
         daal_kernel,
@@ -152,7 +153,8 @@ static result_t call_binary_daal_kernel(const context_cpu& ctx,
     if (!kernel_impl) {
         throw internal_error{ dal::detail::error_messages::unknown_kernel_function_type() };
     }
-    const auto daal_kernel = kernel_impl->get_daal_kernel_function();
+    const bool is_dense{ data.get_kind() == homogen_table::kind() };
+    const auto daal_kernel = kernel_impl->get_daal_kernel_function(is_dense);
 
     daal_svm::training::internal::KernelParameter daal_svm_parameter;
     daal_svm_parameter.kernel = daal_kernel;
