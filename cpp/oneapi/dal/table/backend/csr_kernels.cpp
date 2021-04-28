@@ -152,7 +152,7 @@ void csr_pull_sparse_block(const Policy& policy,
                                         const array<std::int64_t>& origin_row_indices,    \
                                         detail::sparse_block<BlockData>& block,           \
                                         alloc_kind requested_alloc_kind,                  \
-                                        bool preserve_mutability = false);
+                                        bool preserve_mutability);
 
 #define INSTANTIATE_ALL_POLICIES(Data) INSTANTIATE(detail::default_host_policy, Data)
 
