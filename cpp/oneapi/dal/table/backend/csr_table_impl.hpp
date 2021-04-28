@@ -37,7 +37,8 @@ public:
                    const array<std::int64_t>& row_indices,
                    data_type dtype,
                    detail::csr_indexing indexing)
-            : meta_(create_csr_metadata(1, dtype)),
+            : meta_(create_csr_metadata(column_count, dtype)),
+              //meta_(create_csr_metadata(1, dtype)),
               data_(data),
               column_indices_(column_indices),
               row_indices_(row_indices),
