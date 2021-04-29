@@ -185,7 +185,7 @@ inline daal::data_management::CSRNumericTablePtr copy_to_daal_csr_table(
 template <typename T>
 inline detail::csr_table convert_from_daal_csr_table(
     const daal::data_management::NumericTablePtr& nt) {
-    daal::data_management::CSRNumericTable *csr_nt =
+    daal::data_management::CSRNumericTable* csr_nt =
         dynamic_cast<daal::data_management::CSRNumericTable*>(nt.get());
     ONEDAL_ASSERT(csr_nt);
     daal::data_management::CSRBlockDescriptor<T> block;
@@ -202,9 +202,9 @@ inline detail::csr_table convert_from_daal_csr_table(
                              reinterpret_cast<std::int64_t*>(daal_row_indices),
                              row_count,
                              column_count,
-                             [csr_nt, block](const T* p) {},
-                             [csr_nt, block](const std::int64_t* p) {},
-                             [csr_nt, block](const std::int64_t* p) {} };
+                             [](const T* p) {},
+                             [](const std::int64_t* p) {},
+                             [](const std::int64_t* p) {} };
     csr_nt->releaseSparseBlock(block);
     return table;
 }
