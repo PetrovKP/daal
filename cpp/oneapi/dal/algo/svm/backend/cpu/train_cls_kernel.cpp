@@ -94,11 +94,13 @@ static result_t call_multiclass_daal_kernel(const context_cpu& ctx,
     daal_multiclass_parameter.nClasses = class_count;
 
     daal_multiclass::Parameter daal_multiclass_parameter_public(class_count);
+
     auto daal_model =
         daal_multiclass::Model::create(column_count, &daal_multiclass_parameter_public);
 
+    const auto daal_layout = daal_data->getDataLayout();
     auto daal_svm_model =
-        daal_multiclass_internal::SvmModel::create<Float>(class_count, column_count);
+        daal_multiclass_internal::SvmModel::create<Float>(class_count, column_count, daal_layout);
     using svm_batch_t = typename daal_svm::training::Batch<Float, to_daal_method<Method>::value>;
     auto svm_batch = daal::services::SharedPtr<svm_batch_t>(new svm_batch_t());
     svm_batch->parameter = daal_svm_parameter;
@@ -141,6 +143,8 @@ static result_t call_binary_daal_kernel(const context_cpu& ctx,
     const std::int64_t row_count = data.get_row_count();
     const std::int64_t column_count = data.get_column_count();
 
+    printf("call_binary_daal_kernel n: %lu; label n: %lu\n", row_count, column_count);
+
     const auto daal_data = interop::convert_to_daal_table<Float>(data);
     const auto daal_weights = interop::convert_to_daal_table<Float>(weights);
 
@@ -172,7 +176,8 @@ static result_t call_binary_daal_kernel(const context_cpu& ctx,
     auto arr_new_label = convert_labels(arr_label, { Float(-1.0), Float(1.0) }, unique_label);
     const auto daal_labels = interop::convert_to_daal_homogen_table(arr_new_label, row_count, 1);
 
-    auto daal_model = daal_svm::Model::create<Float>(column_count);
+    const auto daal_layout = daal_data->getDataLayout();
+    auto daal_model = daal_svm::Model::create<Float>(column_count, daal_layout);
     interop::status_to_exception(dal::backend::dispatch_by_cpu(ctx, [&](auto cpu) {
         return daal_svm_kernel_t<
                    Float,
