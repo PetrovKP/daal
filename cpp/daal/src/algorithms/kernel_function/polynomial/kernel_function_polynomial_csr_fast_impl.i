@@ -256,7 +256,7 @@ services::Status KernelImplPolynomial<fastCSR, algorithmFPType, cpu>::computeInt
     });
 
     return services::Status();
-} // namespace internal
+}
 
 } // namespace internal
 } // namespace polynomial
