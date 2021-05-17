@@ -37,7 +37,7 @@ namespace polynomial
 {
 namespace internal
 {
-Parameter::Parameter(double k, double b, size_t degree) : ParameterBase(), scale(scale), shift(shift), degree(degree) {}
+Parameter::Parameter(double scale, double shift, size_t degree) : ParameterBase(), scale(scale), shift(shift), degree(degree) {}
 
 Input::Input() : kernel_function::Input() {}
 Input::Input(const Input & other) : kernel_function::Input(other) {}
