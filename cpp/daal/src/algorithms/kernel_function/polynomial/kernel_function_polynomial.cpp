@@ -41,6 +41,7 @@ Parameter::Parameter(double scale, double shift, size_t degree) : ParameterBase(
 
 Input::Input() : kernel_function::Input() {}
 Input::Input(const Input & other) : kernel_function::Input(other) {}
+Input::~Input() {}
 
 Status Input::check(const daal::algorithms::Parameter * par, int method) const
 {

@@ -49,9 +49,9 @@ class DAAL_EXPORT Input : public kernel_function::Input
 public:
     Input();
     Input(const Input & other);
-    virtual ~Input();
+    ~Input() override;
 
-    services::Status check(const daal::algorithms::Parameter * par, int method) const DAAL_C11_OVERRIDE;
+    services::Status check(const daal::algorithms::Parameter * par, int method) const override;
 };
 
 } // namespace internal
